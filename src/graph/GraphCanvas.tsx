@@ -35,12 +35,13 @@ const nodeTypes: NodeTypes = {
   tl: TLNode,
 }
 
-function toRFNode(n: GraphNode): Node<TLNodeData> {
+function toRFNode(n: GraphNode, selectedId?: string): Node<TLNodeData> {
   // Flatten payload so TLNode can read role/caption/shape from data.*
   return {
     id: n.id,
     type: 'tl',
     position: n.position,
+    selected: selectedId != null && n.id === selectedId,
     data: {
       label: n.label,
       kind: n.kind,
@@ -142,10 +143,14 @@ function FitViewOnLoad() {
 
 export function GraphCanvas() {
   const graph = useProjectStore((s) => s.project.graph)
+  const selectedId = useProjectStore((s) => s.project.ui.selectedId)
   const setGraph = useProjectStore((s) => s.setGraph)
   const setSelected = useProjectStore((s) => s.setSelected)
 
-  const nodes = useMemo(() => graph.nodes.map(toRFNode), [graph.nodes])
+  const nodes = useMemo(
+    () => graph.nodes.map((n) => toRFNode(n, selectedId)),
+    [graph.nodes, selectedId],
+  )
   const edges = useMemo(() => graph.edges.map(toRFEdge), [graph.edges])
 
   const onNodesChange: OnNodesChange = useCallback(
@@ -153,14 +158,46 @@ export function GraphCanvas() {
       // Always apply against the latest store graph (not a stale render snapshot),
       // otherwise a dimensions/select event can wipe a just-added + New Tensor box.
       const state = useProjectStore.getState()
-      const current = state.project.graph.nodes.map(toRFNode)
+      const current = state.project.graph.nodes.map((n) =>
+        toRFNode(n, state.project.ui.selectedId),
+      )
+      const removedIds = new Set(
+        changes
+          .filter((c): c is { type: 'remove'; id: string } => c.type === 'remove')
+          .map((c) => c.id),
+      )
       const next = applyNodeChanges(changes, current)
       const selected = next.find((n) => n.selected)
-      if (selected) setSelected(selected.id)
-      setGraph(
-        next.map(fromRFNode),
-        state.project.graph.edges,
-      )
+
+      let nextEdges = state.project.graph.edges
+      if (removedIds.size > 0) {
+        nextEdges = nextEdges.filter(
+          (e) => !removedIds.has(e.source) && !removedIds.has(e.target),
+        )
+        if (state.project.ui.selectedId && removedIds.has(state.project.ui.selectedId)) {
+          setSelected(undefined)
+        }
+        const labels = state.project.graph.nodes
+          .filter((n) => removedIds.has(n.id))
+          .map((n) => n.label)
+          .join(', ')
+        useProjectStore.getState().setStatus(`Deleted: ${labels || [...removedIds].join(', ')}`)
+        useProjectStore.getState().appendConsole(`Deleted node(s): ${labels || [...removedIds].join(', ')}`)
+      } else if (selected) {
+        setSelected(selected.id)
+      } else if (changes.some((c) => c.type === 'select')) {
+        // Deselected all
+        const still = next.find((n) => n.selected)
+        if (!still) setSelected(undefined)
+      }
+
+      setGraph(next.map(fromRFNode), nextEdges)
+
+      if (removedIds.size > 0) {
+        queueMicrotask(() => {
+          pushGraphToSource('Node deleted → code updated')
+        })
+      }
     },
     [setGraph, setSelected],
   )
@@ -169,11 +206,58 @@ export function GraphCanvas() {
     (changes) => {
       const state = useProjectStore.getState()
       const current = state.project.graph.edges.map(toRFEdge)
+      const removed = changes.some((c) => c.type === 'remove')
       const next = applyEdgeChanges(changes, current)
       setGraph(state.project.graph.nodes, next.map(fromRFEdge))
+      if (removed) {
+        queueMicrotask(() => {
+          pushGraphToSource('Edge deleted → code updated')
+        })
+        useProjectStore.getState().setStatus('Flecha eliminada')
+      }
     },
     [setGraph],
   )
+
+  // Delete / Backspace when a tensor (or any node) is selected
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return
+      // Don't steal keys from Monaco / inputs / spreadsheet
+      const t = e.target as HTMLElement | null
+      if (
+        t &&
+        (t.tagName === 'INPUT' ||
+          t.tagName === 'TEXTAREA' ||
+          t.isContentEditable ||
+          t.closest('.monaco-editor') ||
+          t.closest('input') ||
+          t.closest('textarea'))
+      ) {
+        return
+      }
+
+      const state = useProjectStore.getState()
+      const id = state.project.ui.selectedId
+      if (!id) return
+
+      const node = state.project.graph.nodes.find((n) => n.id === id)
+      if (!node) return
+
+      e.preventDefault()
+      const nextNodes = state.project.graph.nodes.filter((n) => n.id !== id)
+      const nextEdges = state.project.graph.edges.filter(
+        (ed) => ed.source !== id && ed.target !== id,
+      )
+      setGraph(nextNodes, nextEdges)
+      setSelected(undefined)
+      useProjectStore.getState().setStatus(`Deleted: ${node.label}`)
+      useProjectStore.getState().appendConsole(`Deleted node: ${node.label}`)
+      queueMicrotask(() => pushGraphToSource(`Deleted ${node.label} → code updated`))
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [setGraph, setSelected])
 
   const isValidConnection: IsValidConnection = useCallback(
     (connection: Connection | Edge) => {
@@ -282,6 +366,9 @@ export function GraphCanvas() {
         nodesDraggable
         nodesConnectable
         elementsSelectable
+        edgesFocusable
+        nodesFocusable
+        deleteKeyCode={['Backspace', 'Delete']}
         onlyRenderVisibleElements={false}
         style={{ width: '100%', height: '100%' }}
       >
