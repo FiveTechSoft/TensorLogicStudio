@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react'
 import type { NodeKind } from '@/types/project'
 
@@ -35,6 +36,69 @@ export function kindColor(kind: string): string {
   return KIND_COLORS[kind] ?? '#64748b'
 }
 
+const handleBase: CSSProperties = {
+  width: 14,
+  height: 14,
+  border: '2px solid #0b1220',
+  borderRadius: 999,
+  zIndex: 10,
+}
+
+/** Blue = TensorLogic dataflow · Pink = UI events (Visual Café) */
+function DataHandle(props: {
+  type: 'source' | 'target'
+  position: Position
+  id: string
+  style?: CSSProperties
+}) {
+  return (
+    <Handle
+      type={props.type}
+      position={props.position}
+      id={props.id}
+      title={
+        props.type === 'source'
+          ? 'DATA out (blue) — drag to another tensor / op'
+          : 'DATA in (blue) — drop connection here'
+      }
+      className="!border-2 !border-slate-950 hover:!scale-125 transition-transform"
+      style={{
+        ...handleBase,
+        background: '#38bdf8',
+        boxShadow: '0 0 0 2px rgba(56,189,248,0.35)',
+        ...props.style,
+      }}
+    />
+  )
+}
+
+function EventHandle(props: {
+  type: 'source' | 'target'
+  position: Position
+  id: string
+  style?: CSSProperties
+}) {
+  return (
+    <Handle
+      type={props.type}
+      position={props.position}
+      id={props.id}
+      title={
+        props.type === 'source'
+          ? 'EVENT out (pink) — Visual Café wiring (Run, highlight…)'
+          : 'EVENT in (pink) — receive UI event'
+      }
+      className="!border-2 !border-slate-950 hover:!scale-125 transition-transform"
+      style={{
+        ...handleBase,
+        background: '#f472b6',
+        boxShadow: '0 0 0 2px rgba(244,114,182,0.35)',
+        ...props.style,
+      }}
+    />
+  )
+}
+
 export function TLNode({ data }: NodeProps<TLRFNode>) {
   const color = kindColor(String(data.kind))
   const label = String(data.label ?? data.kind)
@@ -54,31 +118,11 @@ export function TLNode({ data }: NodeProps<TLRFNode>) {
         style={{ borderColor: '#fbbf24' }}
         title="Matrix multiply ×"
       >
-        <Handle
-          type="target"
-          position={Position.Left}
-          id="data-in"
-          style={{ background: '#38bdf8', width: 8, height: 8 }}
-        />
+        <DataHandle type="target" position={Position.Left} id="data-in" />
         <span className="text-xl font-bold text-amber-300 leading-none">×</span>
-        <Handle
-          type="source"
-          position={Position.Right}
-          id="data-out"
-          style={{ background: '#38bdf8', width: 8, height: 8 }}
-        />
-        <Handle
-          type="target"
-          position={Position.Top}
-          id="data-in-top"
-          style={{ background: '#38bdf8', width: 8, height: 8 }}
-        />
-        <Handle
-          type="source"
-          position={Position.Bottom}
-          id="data-out-bottom"
-          style={{ background: '#38bdf8', width: 8, height: 8 }}
-        />
+        <DataHandle type="source" position={Position.Right} id="data-out" />
+        <DataHandle type="target" position={Position.Top} id="data-in-top" />
+        <DataHandle type="source" position={Position.Bottom} id="data-out-bottom" />
       </div>
     )
   }
@@ -93,7 +137,7 @@ export function TLNode({ data }: NodeProps<TLRFNode>) {
   return (
     <div
       className={[
-        'rounded-lg border shadow-lg shadow-black/40',
+        'rounded-lg border shadow-lg shadow-black/40 relative',
         isMatrixBox
           ? 'min-w-[168px] min-h-[96px] px-4 py-3 bg-slate-900'
           : 'min-w-[140px] px-3 py-2 bg-slate-900/95',
@@ -101,22 +145,23 @@ export function TLNode({ data }: NodeProps<TLRFNode>) {
       style={{
         borderColor: color,
         borderWidth: isMatrixBox ? 2 : 1,
-        boxShadow: isMatrixBox ? `0 0 0 1px ${color}33, 0 8px 24px rgba(0,0,0,0.45)` : undefined,
+        boxShadow: isMatrixBox
+          ? `0 0 0 1px ${color}33, 0 8px 24px rgba(0,0,0,0.45)`
+          : undefined,
       }}
     >
-      <Handle
+      {/* Left: inputs */}
+      <DataHandle
         type="target"
         position={Position.Left}
         id="data-in"
-        style={{ top: '35%', background: '#38bdf8', width: 8, height: 8 }}
-        title="data-in"
+        style={{ top: '38%' }}
       />
-      <Handle
+      <EventHandle
         type="target"
         position={Position.Left}
         id="event-in"
-        style={{ top: '65%', background: '#f472b6', width: 8, height: 8 }}
-        title="event-in"
+        style={{ top: '68%' }}
       />
 
       <div
@@ -145,19 +190,18 @@ export function TLNode({ data }: NodeProps<TLRFNode>) {
         </div>
       )}
 
-      <Handle
+      {/* Right: outputs — start drag from blue to wire tensors */}
+      <DataHandle
         type="source"
         position={Position.Right}
         id="data-out"
-        style={{ top: '35%', background: '#38bdf8', width: 8, height: 8 }}
-        title="data-out"
+        style={{ top: '38%' }}
       />
-      <Handle
+      <EventHandle
         type="source"
         position={Position.Right}
         id="event-out"
-        style={{ top: '65%', background: '#f472b6', width: 8, height: 8 }}
-        title="event-out"
+        style={{ top: '68%' }}
       />
     </div>
   )

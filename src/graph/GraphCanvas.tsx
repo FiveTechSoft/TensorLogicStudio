@@ -8,12 +8,16 @@ import {
   applyEdgeChanges,
   useReactFlow,
   useNodesInitialized,
+  MarkerType,
+  ConnectionMode,
   type Node,
   type Edge,
   type OnNodesChange,
   type OnEdgesChange,
   type OnConnect,
   type NodeTypes,
+  type Connection,
+  type IsValidConnection,
   BackgroundVariant,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
@@ -94,6 +98,7 @@ function fromRFNode(n: Node): GraphNode {
 }
 
 function toRFEdge(e: GraphEdge): Edge {
+  const isEvent = e.kind === 'event'
   return {
     id: e.id,
     source: e.source,
@@ -102,6 +107,16 @@ function toRFEdge(e: GraphEdge): Edge {
     sourceHandle: e.sourceHandle,
     targetHandle: e.targetHandle,
     label: e.label,
+    markerEnd: {
+      type: MarkerType.ArrowClosed,
+      width: 18,
+      height: 18,
+      color: isEvent ? '#f472b6' : '#38bdf8',
+    },
+    style: {
+      stroke: isEvent ? '#f472b6' : '#38bdf8',
+      strokeWidth: 2.5,
+    },
   }
 }
 
@@ -191,42 +206,83 @@ export function GraphCanvas() {
     [setGraph],
   )
 
+  const isValidConnection: IsValidConnection = useCallback(
+    (connection: Connection | Edge) => {
+      if (!connection.source || !connection.target) return false
+      if (connection.source === connection.target) return false
+      // Prefer data-out → data-in and event-out → event-in
+      const sh = connection.sourceHandle ?? ''
+      const th = connection.targetHandle ?? ''
+      if (sh.includes('event') && th.includes('data')) return false
+      if (sh.includes('data') && th.includes('event')) return false
+      return true
+    },
+    [],
+  )
+
   const onConnect: OnConnect = useCallback(
     (connection) => {
       if (!connection.source || !connection.target) return
+      if (connection.source === connection.target) return
 
-      const sourceNode = graph.nodes.find((n) => n.id === connection.source)
-      const targetNode = graph.nodes.find((n) => n.id === connection.target)
-      const handleIsEvent = connection.sourceHandle?.includes('event')
-        || connection.targetHandle?.includes('event')
+      // Latest graph from store (avoid stale closure wiping concurrent adds)
+      const state = useProjectStore.getState()
+      const nodesNow = state.project.graph.nodes
+      const edgesNow = state.project.graph.edges
+
+      const sourceNode = nodesNow.find((n) => n.id === connection.source)
+      const targetNode = nodesNow.find((n) => n.id === connection.target)
+      const handleIsEvent =
+        connection.sourceHandle?.includes('event') ||
+        connection.targetHandle?.includes('event')
       const uiIsEvent =
-        (sourceNode != null && UI_EVENT_KINDS.has(sourceNode.kind))
-        || (targetNode != null && UI_EVENT_KINDS.has(targetNode.kind))
+        (sourceNode != null && UI_EVENT_KINDS.has(sourceNode.kind)) ||
+        (targetNode != null && UI_EVENT_KINDS.has(targetNode.kind))
 
       const kind: EdgeKind = handleIsEvent || uiIsEvent ? 'event' : 'data'
 
-      let sourceHandle = connection.sourceHandle ?? undefined
-      let targetHandle = connection.targetHandle ?? undefined
+      let sourceHandle = connection.sourceHandle ?? 'data-out'
+      let targetHandle = connection.targetHandle ?? 'data-in'
       if (kind === 'event') {
-        if (isGenericEventHandle(sourceHandle)) {
+        if (isGenericEventHandle(sourceHandle) || sourceHandle === 'data-out') {
           sourceHandle = defaultEventOutPort(sourceNode?.kind)
         }
-        if (isGenericEventHandle(targetHandle)) {
+        if (isGenericEventHandle(targetHandle) || targetHandle === 'data-in') {
           targetHandle = defaultEventInPort(targetNode?.kind)
         }
+      } else {
+        // Normalize to data ports for tensor wiring
+        if (!sourceHandle || sourceHandle.includes('event')) sourceHandle = 'data-out'
+        if (!targetHandle || targetHandle.includes('event')) targetHandle = 'data-in'
       }
+
+      // Avoid duplicate edges
+      const dup = edgesNow.some(
+        (e) =>
+          e.source === connection.source &&
+          e.target === connection.target &&
+          e.kind === kind &&
+          (e.sourceHandle ?? '') === sourceHandle &&
+          (e.targetHandle ?? '') === targetHandle,
+      )
+      if (dup) return
 
       const edge: GraphEdge = {
         id: `e-${crypto.randomUUID()}`,
         kind,
-        source: connection.source,
-        target: connection.target,
+        source: connection.source!,
+        target: connection.target!,
         sourceHandle,
         targetHandle,
+        label: kind === 'data' ? '→' : undefined,
       }
-      const nextEdges = [...graph.edges, edge]
-      setGraph(graph.nodes, nextEdges)
-      // Dataflow edges regenerate TensorLogic source (two-way)
+      setGraph(nodesNow, [...edgesNow, edge])
+      useProjectStore.getState().setStatus(
+        kind === 'data'
+          ? `Data arrow: ${sourceNode?.label ?? '?'} → ${targetNode?.label ?? '?'}`
+          : `Event arrow: ${sourceNode?.label ?? '?'} → ${targetNode?.label ?? '?'}`,
+      )
+
       if (kind === 'data') {
         queueMicrotask(() => {
           const srcL = sourceNode?.label ?? connection.source
@@ -235,7 +291,7 @@ export function GraphCanvas() {
         })
       }
     },
-    [graph.nodes, graph.edges, setGraph],
+    [setGraph],
   )
 
   const onNodeClick = useCallback(
@@ -260,12 +316,24 @@ export function GraphCanvas() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        isValidConnection={isValidConnection}
         onNodeClick={onNodeClick}
         fitView
         fitViewOptions={{ padding: 0.25, maxZoom: 1.15 }}
         proOptions={{ hideAttribution: true }}
         colorMode="dark"
-        defaultEdgeOptions={{ type: 'data' }}
+        connectionMode={ConnectionMode.Loose}
+        connectionRadius={28}
+        connectionLineStyle={{ stroke: '#38bdf8', strokeWidth: 2.5 }}
+        defaultEdgeOptions={{
+          type: 'data',
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: '#38bdf8',
+            width: 18,
+            height: 18,
+          },
+        }}
         minZoom={0.3}
         maxZoom={2}
         nodesDraggable

@@ -93,8 +93,18 @@ export function Palette() {
           </button>
         ))}
       </div>
-      <div className="pointer-events-none text-[10px] text-slate-500 px-1">
-        + New Tensor adds a box on this canvas · wire with cyan handles · code updates left
+      <div className="pointer-events-none text-[10px] text-slate-500 px-1 flex flex-wrap gap-x-3 gap-y-0.5">
+        <span>
+          <span className="inline-block w-2 h-2 rounded-full bg-sky-400 align-middle mr-1" />
+          <strong className="text-sky-400/90">Azul</strong> = datos (tensor → tensor / op)
+        </span>
+        <span>
+          <span className="inline-block w-2 h-2 rounded-full bg-pink-400 align-middle mr-1" />
+          <strong className="text-pink-400/90">Rosa</strong> = eventos UI (Run, highlight…)
+        </span>
+        <span className="text-slate-600">
+          Arrastra desde el punto azul derecho de una caja al azul izquierdo de otra
+        </span>
       </div>
     </div>
   )

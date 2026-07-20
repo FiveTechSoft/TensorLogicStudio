@@ -26,6 +26,25 @@ html, body, #root {
   visibility: visible !important;
 }
 
+/* Larger, easier to grab connection ports */
+.react-flow__handle {
+  opacity: 1 !important;
+  pointer-events: all !important;
+}
+
+.react-flow__handle-connecting {
+  background: #fbbf24 !important;
+}
+
+.react-flow__handle-valid {
+  background: #4ade80 !important;
+}
+
+.react-flow__connection-path {
+  stroke: #38bdf8 !important;
+  stroke-width: 2.5 !important;
+}
+
 .react-flow__renderer,
 .react-flow__pane,
 .react-flow__viewport {
