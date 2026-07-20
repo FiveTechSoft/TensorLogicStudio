@@ -5,7 +5,7 @@ import { ConsolePanel } from './ConsolePanel'
 import { CodeEditor } from '@/editor/CodeEditor'
 import { graphFromSource } from '@/editor/syncFromSource'
 import { GraphCanvas } from '@/graph/GraphCanvas'
-import { PropertiesPanel } from '@/inspector/PropertiesPanel'
+import { InspectorPanel } from '@/inspector/InspectorPanel'
 import { useProjectStore } from '@/store/projectStore'
 
 function PaneHeader({ children }: { children: ReactNode }) {
@@ -64,7 +64,7 @@ export function AppShell() {
 
         <section className="min-h-0 flex flex-col bg-[#0c1424]/80">
           <PaneHeader>Inspector</PaneHeader>
-          <PropertiesPanel />
+          <InspectorPanel />
         </section>
       </div>
 
