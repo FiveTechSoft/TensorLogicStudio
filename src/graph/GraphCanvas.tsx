@@ -18,9 +18,34 @@ import '@xyflow/react/dist/style.css'
 
 import { useProjectStore } from '@/store/projectStore'
 import type { GraphNode, GraphEdge, EdgeKind, NodeKind } from '@/types/project'
+import { ideBus } from '@/runtime/ideRuntime'
 import { edgeTypes } from './edgeTypes'
 import { TLNode, kindColor, type TLNodeData } from './nodes/TLNode'
 import { Palette } from './Palette'
+
+/** Logical event-out port for a node kind (Visual Café). */
+function defaultEventOutPort(kind?: NodeKind): string {
+  if (kind === 'query') return 'onMatch'
+  return 'onClick'
+}
+
+/** Logical event-in port for a node kind (Visual Café). */
+function defaultEventInPort(kind?: NodeKind): string {
+  if (kind === 'console') return 'log'
+  if (kind === 'matrixView' || kind === 'highlight') return 'highlight'
+  return 'run'
+}
+
+function isGenericEventHandle(handle?: string | null): boolean {
+  return (
+    handle == null
+    || handle === ''
+    || handle === 'event-out'
+    || handle === 'event-in'
+    || handle === 'out'
+    || handle === 'in'
+  )
+}
 
 const nodeTypes: NodeTypes = {
   tl: TLNode,
@@ -126,13 +151,24 @@ export function GraphCanvas() {
 
       const kind: EdgeKind = handleIsEvent || uiIsEvent ? 'event' : 'data'
 
+      let sourceHandle = connection.sourceHandle ?? undefined
+      let targetHandle = connection.targetHandle ?? undefined
+      if (kind === 'event') {
+        if (isGenericEventHandle(sourceHandle)) {
+          sourceHandle = defaultEventOutPort(sourceNode?.kind)
+        }
+        if (isGenericEventHandle(targetHandle)) {
+          targetHandle = defaultEventInPort(targetNode?.kind)
+        }
+      }
+
       const edge: GraphEdge = {
         id: `e-${crypto.randomUUID()}`,
         kind,
         source: connection.source,
         target: connection.target,
-        sourceHandle: connection.sourceHandle ?? undefined,
-        targetHandle: connection.targetHandle ?? undefined,
+        sourceHandle,
+        targetHandle,
       }
       setGraph(graph.nodes, [...graph.edges, edge])
     },
@@ -142,6 +178,10 @@ export function GraphCanvas() {
   const onNodeClick = useCallback(
     (_: MouseEvent, node: Node) => {
       setSelected(node.id)
+      const kind = String((node.data as TLNodeData | undefined)?.kind ?? '')
+      if (kind === 'run' || kind === 'button') {
+        ideBus.emit(`${node.id}:onClick`)
+      }
     },
     [setSelected],
   )

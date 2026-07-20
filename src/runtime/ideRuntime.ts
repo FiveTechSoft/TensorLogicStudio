@@ -1,10 +1,21 @@
 import { Runtime, type RunResult } from '@/core/runtime/Runtime'
 import { EventBus } from '@/core/events/EventBus'
 import type { DenseTensor } from '@/core/tensor/Tensor'
-import type { MatrixEntry } from '@/store/projectStore'
+import { useProjectStore, type MatrixEntry } from '@/store/projectStore'
 
 export const ideRuntime = new Runtime()
 export const ideBus = new EventBus()
+
+/** Emit `${queryNodeId}:onMatch` when the last publish produced bindings. */
+export function emitQueryOnMatch(): void {
+  const s = useProjectStore.getState()
+  if (s.queryBindings.length === 0) return
+  for (const n of s.project.graph.nodes) {
+    if (n.kind === 'query') {
+      ideBus.emit(`${n.id}:onMatch`, s.queryBindings)
+    }
+  }
+}
 
 export interface InspectorActions {
   setMatrices: (m: MatrixEntry[]) => void
@@ -118,6 +129,7 @@ export function runAndPublish(source: string, actions: InspectorActions): RunRes
   }
 
   publishInspector(ideRuntime, actions)
+  emitQueryOnMatch()
 
   const status = result.fixpoint
     ? `Fixpoint · ${result.iterations} iteration(s)${result.ms != null ? ` · ${result.ms.toFixed(1)}ms` : ''}`
@@ -149,6 +161,7 @@ export function stepAndPublish(source: string, actions: InspectorActions): RunRe
   actions.setStatus('Stepping…')
   const result = ideRuntime.step()
   publishInspector(ideRuntime, actions)
+  emitQueryOnMatch()
 
   const status = result.fixpoint
     ? `Step fixpoint · ${result.iterations} iteration(s)`
