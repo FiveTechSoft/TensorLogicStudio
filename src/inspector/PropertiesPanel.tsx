@@ -21,8 +21,8 @@ export function PropertiesPanel() {
 
   if (!node) {
     return (
-      <div className="flex-1 flex items-center justify-center text-slate-600 text-sm px-3">
-        Select a node
+      <div className="flex-1 flex items-center justify-center text-slate-600 text-xs px-4 text-center leading-relaxed">
+        Select a graph node to inspect its kind, AST id, and editable label.
       </div>
     )
   }

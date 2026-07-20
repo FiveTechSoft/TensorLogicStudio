@@ -122,13 +122,28 @@ export function Toolbar() {
       </div>
 
       <div className="flex items-center gap-1.5 ml-auto">
-        <button type="button" className={btnClass} onClick={handleRun}>
+        <button
+          type="button"
+          className={btnClass}
+          onClick={handleRun}
+          title="Run program to fixpoint (forward chaining)"
+        >
           Run
         </button>
-        <button type="button" className={btnClass} onClick={handleStep}>
+        <button
+          type="button"
+          className={btnClass}
+          onClick={handleStep}
+          title="Execute one forward-chaining iteration"
+        >
           Step
         </button>
-        <button type="button" className={btnClass} onClick={handleStop}>
+        <button
+          type="button"
+          className={btnClass}
+          onClick={handleStop}
+          title="Stop a long-running inference"
+        >
           Stop
         </button>
         <span className="w-px h-4 bg-slate-700 mx-1" aria-hidden />
@@ -139,6 +154,7 @@ export function Toolbar() {
             aria-expanded={examplesOpen}
             aria-haspopup="menu"
             onClick={() => setExamplesOpen((o) => !o)}
+            title="Load a bundled demo project"
           >
             Examples
           </button>
@@ -152,6 +168,7 @@ export function Toolbar() {
                 role="menuitem"
                 className={menuItemClass}
                 onClick={() => loadExample(genealogyProject)}
+                title="Parent/ancestor Datalog demo with query bindings"
               >
                 Genealogy
               </button>
@@ -160,16 +177,27 @@ export function Toolbar() {
                 role="menuitem"
                 className={menuItemClass}
                 onClick={() => loadExample(mlpProject)}
+                title="Small dense MLP forward (and optional train step)"
               >
                 MLP
               </button>
             </div>
           )}
         </div>
-        <button type="button" className={btnClass} onClick={handleSave}>
+        <button
+          type="button"
+          className={btnClass}
+          onClick={handleSave}
+          title="Download project as .tls.json"
+        >
           Save
         </button>
-        <button type="button" className={btnClass} onClick={handleLoadClick}>
+        <button
+          type="button"
+          className={btnClass}
+          onClick={handleLoadClick}
+          title="Open a saved .tls.json project"
+        >
           Load
         </button>
         <input

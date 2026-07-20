@@ -134,6 +134,53 @@ export function runCurrentProject(source: string): RunResult {
 }
 
 /** Full Run path: load → forward → publish store + bus. */
+/** Build status text + last-run snapshot after publishInspector. */
+function finalizeRunStatus(
+  result: RunResult,
+  actions: InspectorActions,
+  mode: 'run' | 'step',
+): string {
+  const entityCount = collectDomainSymbols(ideRuntime).length
+  const bindingCount = useProjectStore.getState().queryBindings.length
+  const successfulDeduction = bindingCount > 0
+
+  useProjectStore.getState().setLastRun({
+    fixpoint: result.fixpoint,
+    iterations: result.iterations,
+    ms: result.ms,
+    entityCount,
+    bindingCount,
+    successfulDeduction,
+  })
+
+  const parts: string[] = []
+  if (mode === 'step') {
+    parts.push(result.fixpoint ? 'Step fixpoint' : 'Step')
+  } else {
+    parts.push(result.fixpoint ? 'Fixpoint' : 'No fixpoint')
+  }
+  parts.push(
+    `${result.iterations} iteration${result.iterations === 1 ? '' : 's'}`,
+  )
+  if (entityCount > 0) {
+    parts.push(`${entityCount} entit${entityCount === 1 ? 'y' : 'ies'}`)
+  }
+  if (result.ms != null) {
+    parts.push(`${result.ms.toFixed(1)} ms`)
+  }
+  if (successfulDeduction) {
+    parts.push(`${bindingCount} binding${bindingCount === 1 ? '' : 's'}`)
+  }
+
+  const status = parts.join(' · ')
+  actions.setStatus(status)
+  actions.appendConsole(status)
+  if (successfulDeduction) {
+    actions.appendConsole('SUCCESSFUL DEDUCTION')
+  }
+  return status
+}
+
 export function runAndPublish(source: string, actions: InspectorActions): RunResult {
   actions.setStatus('Running…')
   actions.appendConsole('Run started')
@@ -145,17 +192,14 @@ export function runAndPublish(source: string, actions: InspectorActions): RunRes
     const msg = err instanceof Error ? err.message : String(err)
     actions.setStatus(`Error: ${msg}`)
     actions.appendConsole(`Error: ${msg}`)
+    useProjectStore.getState().setLastRun(null)
     throw err
   }
 
   publishInspector(ideRuntime, actions)
   emitQueryOnMatch()
+  finalizeRunStatus(result, actions, 'run')
 
-  const status = result.fixpoint
-    ? `Fixpoint · ${result.iterations} iteration(s)${result.ms != null ? ` · ${result.ms.toFixed(1)}ms` : ''}`
-    : `No fixpoint · ${result.iterations} iteration(s)${result.ms != null ? ` · ${result.ms.toFixed(1)}ms` : ''}`
-  actions.setStatus(status)
-  actions.appendConsole(status)
   for (const t of ideRuntime.getTrace()) {
     if (t.message) actions.appendConsole(t.message)
   }
@@ -174,6 +218,7 @@ export function stepAndPublish(source: string, actions: InspectorActions): RunRe
       const msg = err instanceof Error ? err.message : String(err)
       actions.setStatus(`Error: ${msg}`)
       actions.appendConsole(`Error: ${msg}`)
+      useProjectStore.getState().setLastRun(null)
       throw err
     }
   }
@@ -182,12 +227,7 @@ export function stepAndPublish(source: string, actions: InspectorActions): RunRe
   const result = ideRuntime.step()
   publishInspector(ideRuntime, actions)
   emitQueryOnMatch()
-
-  const status = result.fixpoint
-    ? `Step fixpoint · ${result.iterations} iteration(s)`
-    : `Step · ${result.iterations} iteration(s)`
-  actions.setStatus(status)
-  actions.appendConsole(status)
+  finalizeRunStatus(result, actions, 'step')
   ideBus.emit('step', result)
   return result
 }

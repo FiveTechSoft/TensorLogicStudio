@@ -23,7 +23,10 @@ export function ConsolePanel() {
       {open && (
         <div className="h-28 overflow-auto px-3 pb-2 font-mono text-xs text-slate-400">
           {consoleLines.length === 0 ? (
-            <div className="text-slate-600 italic">No console output</div>
+            <div className="text-slate-600 italic leading-relaxed py-1">
+              No console output yet. Run a program or load an example to see
+              traces, status, and diagnostics here.
+            </div>
           ) : (
             consoleLines.map((line, i) => (
               <div key={i} className="leading-5 whitespace-pre-wrap">

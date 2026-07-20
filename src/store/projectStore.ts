@@ -9,6 +9,17 @@ export interface MatrixEntry {
   matrix: number[][]
 }
 
+/** Snapshot of the most recent Run / Step for the status bar. */
+export interface LastRunInfo {
+  fixpoint: boolean
+  iterations: number
+  ms?: number
+  entityCount: number
+  bindingCount: number
+  /** True when a query returned one or more bindings (successful deduction). */
+  successfulDeduction: boolean
+}
+
 interface ProjectState {
   project: Project
   sourceDirty: boolean
@@ -19,6 +30,7 @@ interface ProjectState {
   status: string
   matrices: MatrixEntry[]
   queryBindings: Record<string, string>[]
+  lastRun: LastRunInfo | null
   setSource: (source: string) => void
   setGraph: (nodes: GraphNode[], edges: GraphEdge[]) => void
   loadProject: (p: Project) => void
@@ -30,6 +42,7 @@ interface ProjectState {
   setGraphStale: (v: boolean) => void
   setMatrices: (m: MatrixEntry[]) => void
   setQueryBindings: (b: Record<string, string>[]) => void
+  setLastRun: (info: LastRunInfo | null) => void
 }
 
 export const useProjectStore = create<ProjectState>((set) => ({
@@ -42,6 +55,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
   status: 'Ready',
   matrices: [],
   queryBindings: [],
+  lastRun: null,
   setSource: (source) =>
     set((s) => ({
       project: { ...s.project, source, meta: { ...s.project.meta, updatedAt: new Date().toISOString() } },
@@ -62,6 +76,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       status: 'Ready',
       matrices: [],
       queryBindings: [],
+      lastRun: null,
     }),
   setSelected: (id) =>
     set((s) => ({ project: { ...s.project, ui: { ...s.project.ui, selectedId: id } } })),
@@ -72,4 +87,5 @@ export const useProjectStore = create<ProjectState>((set) => ({
   setGraphStale: (graphStale) => set({ graphStale }),
   setMatrices: (matrices) => set({ matrices }),
   setQueryBindings: (queryBindings) => set({ queryBindings }),
+  setLastRun: (lastRun) => set({ lastRun }),
 }))

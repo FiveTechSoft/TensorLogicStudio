@@ -25,8 +25,13 @@ export function InspectorPanel() {
           Matrices
         </div>
         {matrices.length === 0 ? (
-          <div className="text-xs text-slate-600 italic">
-            Run a program to see tensors
+          <div className="text-xs text-slate-600 italic leading-relaxed">
+            No tensors yet. Load{' '}
+            <span className="text-slate-500 not-italic">Examples → Genealogy</span>{' '}
+            or{' '}
+            <span className="text-slate-500 not-italic">MLP</span>, then press{' '}
+            <span className="text-slate-500 not-italic">Run</span> to populate
+            heatmaps.
           </div>
         ) : (
           matrices.map((m, i) => (

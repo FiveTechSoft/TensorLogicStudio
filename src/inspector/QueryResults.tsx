@@ -5,7 +5,11 @@ export interface QueryResultsProps {
 export function QueryResults({ bindings }: QueryResultsProps) {
   if (bindings.length === 0) {
     return (
-      <div className="text-xs text-slate-600 italic px-0.5">No query bindings</div>
+      <div className="text-xs text-slate-600 italic px-0.5 leading-relaxed">
+        No query bindings. Add a{' '}
+        <span className="text-slate-500 not-italic font-mono">?- goal.</span>{' '}
+        and Run to see variable substitutions here.
+      </div>
     )
   }
 
