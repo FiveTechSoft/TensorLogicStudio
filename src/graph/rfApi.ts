@@ -13,7 +13,7 @@ export function getReactFlowInstance(): ReactFlowInstance | null {
 /** Move a node into the visible center of the graph pane and zoom to it. */
 export function revealNodeInView(nodeId: string): void {
   const rf = instance
-  if (!rf) return
+  if (!rf || typeof document === 'undefined') return
 
   const pane = document.querySelector('.react-flow') as HTMLElement | null
   if (pane) {
@@ -46,6 +46,8 @@ export function revealNodeInView(nodeId: string): void {
     })
   }
   focus()
-  window.setTimeout(focus, 100)
-  window.setTimeout(focus, 300)
+  if (typeof window !== 'undefined') {
+    window.setTimeout(focus, 100)
+    window.setTimeout(focus, 300)
+  }
 }

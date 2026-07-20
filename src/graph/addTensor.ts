@@ -100,8 +100,10 @@ export function addTensorBox(kind: 'relation' | 'tensor' = 'relation'): string {
     if (!cur.project.graph.nodes.some((n) => n.id === id)) {
       cur.setGraph([...cur.project.graph.nodes, node], cur.project.graph.edges)
     }
-    window.setTimeout(() => revealNodeInView(id), 50)
-    window.setTimeout(() => revealNodeInView(id), 250)
+    if (typeof window !== 'undefined') {
+      window.setTimeout(() => revealNodeInView(id), 50)
+      window.setTimeout(() => revealNodeInView(id), 250)
+    }
   })
 
   s.setStatus(`Created tensor ${label}`)
