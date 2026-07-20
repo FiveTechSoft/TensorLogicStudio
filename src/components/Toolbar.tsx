@@ -1,13 +1,21 @@
+import { useEffect, useRef, useState } from 'react'
 import { useProjectStore } from '@/store/projectStore'
+import { genealogyProject } from '@/examples/genealogy'
+import { mlpProject } from '@/examples/mlp'
 import {
+  loadProjectIntoIde,
   runAndPublish,
   stepAndPublish,
   stopRuntime,
   type InspectorActions,
 } from '@/runtime/ideRuntime'
+import type { Project } from '@/types/project'
 
 const btnClass =
   'px-3 py-1 rounded border border-slate-700 bg-slate-900/60 text-slate-200 text-xs font-medium hover:bg-slate-800 hover:border-slate-600 active:bg-slate-700 transition-colors'
+
+const menuItemClass =
+  'w-full text-left px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-800 transition-colors'
 
 function inspectorActionsFromStore(): InspectorActions {
   const s = useProjectStore.getState()
@@ -22,6 +30,19 @@ function inspectorActionsFromStore(): InspectorActions {
 
 export function Toolbar() {
   const projectName = useProjectStore((s) => s.project.name)
+  const [examplesOpen, setExamplesOpen] = useState(false)
+  const examplesRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!examplesOpen) return
+    const onDoc = (e: MouseEvent) => {
+      if (!examplesRef.current?.contains(e.target as Node)) {
+        setExamplesOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [examplesOpen])
 
   const handleRun = () => {
     const s = useProjectStore.getState()
@@ -52,6 +73,12 @@ export function Toolbar() {
     stopRuntime(inspectorActionsFromStore())
   }
 
+  const loadExample = (project: Project) => {
+    // Clone so loaders never mutate the module constant.
+    loadProjectIntoIde(structuredClone(project))
+    setExamplesOpen(false)
+  }
+
   return (
     <header className="flex items-center gap-4 px-4 py-2 border-b border-slate-800 bg-[#0c1424] shrink-0">
       <div className="flex items-center gap-3 min-w-0">
@@ -75,9 +102,40 @@ export function Toolbar() {
           Stop
         </button>
         <span className="w-px h-4 bg-slate-700 mx-1" aria-hidden />
-        <button type="button" className={btnClass} onClick={() => {}}>
-          Examples
-        </button>
+        <div className="relative" ref={examplesRef}>
+          <button
+            type="button"
+            className={btnClass}
+            aria-expanded={examplesOpen}
+            aria-haspopup="menu"
+            onClick={() => setExamplesOpen((o) => !o)}
+          >
+            Examples
+          </button>
+          {examplesOpen && (
+            <div
+              role="menu"
+              className="absolute right-0 top-full mt-1 z-50 min-w-[140px] rounded border border-slate-700 bg-[#0c1424] shadow-lg shadow-black/40 py-1"
+            >
+              <button
+                type="button"
+                role="menuitem"
+                className={menuItemClass}
+                onClick={() => loadExample(genealogyProject)}
+              >
+                Genealogy
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className={menuItemClass}
+                onClick={() => loadExample(mlpProject)}
+              >
+                MLP
+              </button>
+            </div>
+          )}
+        </div>
         <button type="button" className={btnClass} onClick={() => {}}>
           Save
         </button>

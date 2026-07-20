@@ -199,7 +199,9 @@ export function graphFromSource(
 
     const eventEdges = prev.edges.filter((e) => {
       if (e.kind !== 'event') return false
-      return nodeIds.has(e.source) && nodeIds.has(e.target)
+      // Synthetic `runtime` target is always available in AppShell actions map.
+      const targetOk = nodeIds.has(e.target) || e.target === 'runtime'
+      return nodeIds.has(e.source) && targetOk
     })
 
     const laidOut = layoutGraph(allNodes, dataEdges)

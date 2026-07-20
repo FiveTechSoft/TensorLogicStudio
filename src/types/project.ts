@@ -44,6 +44,8 @@ export interface Project {
     createdAt: string
     updatedAt: string
     exampleId?: string
+    /** Dense tensor seeds applied when loading this project (e.g. MLP examples). */
+    denseSeeds?: Record<string, { shape: number[]; data: number[] }>
   }
 }
 

@@ -50,6 +50,11 @@ export class Runtime {
     this.dense.set(name, seedDenseTensor(shape, rowMajorValues))
   }
 
+  /** Drop all dense tensors (used when switching example projects). */
+  clearDense(): void {
+    this.dense.clear()
+  }
+
   /** Request cooperative stop of an in-progress run / step loop. */
   stop(): void {
     this.stopRequested = true

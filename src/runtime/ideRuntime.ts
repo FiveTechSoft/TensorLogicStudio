@@ -1,10 +1,30 @@
 import { Runtime, type RunResult } from '@/core/runtime/Runtime'
 import { EventBus } from '@/core/events/EventBus'
 import type { DenseTensor } from '@/core/tensor/Tensor'
+import type { Project } from '@/types/project'
 import { useProjectStore, type MatrixEntry } from '@/store/projectStore'
 
 export const ideRuntime = new Runtime()
 export const ideBus = new EventBus()
+
+/**
+ * Apply (or clear) dense tensor seeds when loading a project / example.
+ * Always clears first so switching examples does not leak prior dense state.
+ */
+export function applyProjectDenseSeeds(project: Project): void {
+  ideRuntime.clearDense()
+  const seeds = project.meta.denseSeeds
+  if (!seeds) return
+  for (const [name, seed] of Object.entries(seeds)) {
+    ideRuntime.seedDense(name, seed.shape, seed.data)
+  }
+}
+
+/** Load a project into the store and seed any dense tensors for the runtime. */
+export function loadProjectIntoIde(project: Project): void {
+  useProjectStore.getState().loadProject(project)
+  applyProjectDenseSeeds(project)
+}
 
 /** Emit `${queryNodeId}:onMatch` when the last publish produced bindings. */
 export function emitQueryOnMatch(): void {
