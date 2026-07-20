@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { useProjectStore } from '@/store/projectStore'
 import { genealogyProject } from '@/examples/genealogy'
+import { matrixMultiplyProject } from '@/examples/matrixMultiply'
 import { mlpProject } from '@/examples/mlp'
 import {
   loadProjectIntoIde,
@@ -180,6 +181,15 @@ export function Toolbar() {
                 title="Small dense MLP forward (and optional train step)"
               >
                 MLP
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className={menuItemClass}
+                onClick={() => loadExample(matrixMultiplyProject)}
+                title="Matrix product C = A × B with visual (×) edge"
+              >
+                Matrix × Matrix
               </button>
             </div>
           )}

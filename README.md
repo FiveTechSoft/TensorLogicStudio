@@ -37,7 +37,8 @@ Deploys automatically from `main` via GitHub Actions (`.github/workflows/deploy-
 ## How to use
 
 1. **Load the genealogy demo:** toolbar **Examples → Genealogy** (loaded by default on first visit).
-2. **Run:** press **Run**. The status bar should show fixpoint / iterations / entity count, and **SUCCESSFUL DEDUCTION** when the query returns bindings.
+2. **Matrix × Matrix:** **Examples → Matrix × Matrix** — two matrix boxes **A** and **B** joined by an arrow badge **(×)**, product **C**. Press **Run** to see `C = A×B` in the inspector.
+3. **Run:** press **Run**. The status bar should show fixpoint / iterations / entity count, and **SUCCESSFUL DEDUCTION** when the query returns bindings.
 3. **Inspect:** matrices (e.g. parent / ancestor) and query bindings appear in the right-hand Inspector.
 4. **MLP:** **Examples → MLP**, then **Run**, to exercise dense forward equations and tensor heatmaps.
 5. **Visual → code (two-way):** In **Tensor Graph**, use **+ New Tensor** (and ops like Einsum / Step / ReLU). Create two tensors, add an operation, drag **cyan data handles** to wire `A → op → B`. The **Declarative Rules** panel updates automatically. Typing in the editor still updates the graph.

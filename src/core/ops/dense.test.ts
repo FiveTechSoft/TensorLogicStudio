@@ -15,6 +15,20 @@ describe('dense', () => {
     expect(Y.get([1])).toBe(3)
   })
 
+  it('matmul 2x2 * 2x2', () => {
+    // [[1,2],[3,4]] × [[5,6],[7,8]] = [[19,22],[43,50]]
+    const A = new DenseTensor([2, 2])
+    const B = new DenseTensor([2, 2])
+    A.data.set([1, 2, 3, 4])
+    B.data.set([5, 6, 7, 8])
+    const C = matmul(A, B)
+    expect(C.shape).toEqual([2, 2])
+    expect(C.get([0, 0])).toBe(19)
+    expect(C.get([0, 1])).toBe(22)
+    expect(C.get([1, 0])).toBe(43)
+    expect(C.get([1, 1])).toBe(50)
+  })
+
   it('relu and sigmoid', () => {
     expect(relu(-1)).toBe(0)
     expect(relu(2)).toBe(2)

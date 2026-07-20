@@ -39,6 +39,49 @@ export function TLNode({ data }: NodeProps<TLRFNode>) {
   const color = kindColor(String(data.kind))
   const label = String(data.label ?? data.kind)
   const kind = String(data.kind)
+  const isMul = label === '×' || data.symbol === '×' || data.op === 'matmul'
+  const caption =
+    typeof data.caption === 'string'
+      ? data.caption
+      : Array.isArray(data.shape)
+        ? (data.shape as number[]).join('×')
+        : null
+
+  if (isMul) {
+    return (
+      <div
+        className="flex h-12 w-12 items-center justify-center rounded-full border-2 bg-amber-950 shadow-lg shadow-amber-950/50"
+        style={{ borderColor: '#fbbf24' }}
+        title="Matrix multiply ×"
+      >
+        <Handle
+          type="target"
+          position={Position.Left}
+          id="data-in"
+          style={{ background: '#38bdf8', width: 8, height: 8 }}
+        />
+        <span className="text-xl font-bold text-amber-300 leading-none">×</span>
+        <Handle
+          type="source"
+          position={Position.Right}
+          id="data-out"
+          style={{ background: '#38bdf8', width: 8, height: 8 }}
+        />
+        <Handle
+          type="target"
+          position={Position.Top}
+          id="data-in-top"
+          style={{ background: '#38bdf8', width: 8, height: 8 }}
+        />
+        <Handle
+          type="source"
+          position={Position.Bottom}
+          id="data-out-bottom"
+          style={{ background: '#38bdf8', width: 8, height: 8 }}
+        />
+      </div>
+    )
+  }
 
   return (
     <div
@@ -67,7 +110,7 @@ export function TLNode({ data }: NodeProps<TLRFNode>) {
         className="text-[10px] uppercase tracking-wider mt-0.5 truncate"
         style={{ color }}
       >
-        {kind}
+        {caption ?? kind}
       </div>
 
       <Handle

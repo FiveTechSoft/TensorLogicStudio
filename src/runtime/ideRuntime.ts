@@ -61,15 +61,20 @@ export function collectDomainSymbols(rt: Runtime): string[] {
 function denseToMatrixEntry(name: string, t: DenseTensor): MatrixEntry | null {
   if (t.shape.length === 2) {
     const [rows, cols] = t.shape
+    if (rows === 0 || cols === 0 || rows > 64 || cols > 64) return null
+    // Use column labels for square-ish MatrixView; pad to max dim for display grid
     const n = Math.max(rows, cols)
-    if (n === 0 || n > 64) return null
     const labels = Array.from({ length: n }, (_, i) => String(i))
     const matrix = Array.from({ length: n }, (_, r) =>
       Array.from({ length: n }, (_, c) =>
         r < rows && c < cols ? t.get([r, c]) : 0,
       ),
     )
-    return { title: name, labels, matrix }
+    return {
+      title: `${name} [${rows}×${cols}]`,
+      labels,
+      matrix,
+    }
   }
 
   if (t.shape.length === 1) {

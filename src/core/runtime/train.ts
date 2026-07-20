@@ -94,28 +94,57 @@ function tryMatmulPattern(
   const left = core.left.ref
   const right = core.right.ref
 
-  let Wref: TensorRef
-  let Xref: TensorRef
-  if (left.indices.length === 2 && right.indices.length === 1) {
-    Wref = left
-    Xref = right
-  } else if (right.indices.length === 2 && left.indices.length === 1) {
-    Wref = right
-    Xref = left
+  // Matrix×vector: W[i,j] * X[j]
+  // Matrix×matrix: A[i,j] * B[j,k]
+  let leftRef = left
+  let rightRef = right
+
+  const isMatVec =
+    (left.indices.length === 2 && right.indices.length === 1) ||
+    (right.indices.length === 2 && left.indices.length === 1)
+  const isMatMat = left.indices.length === 2 && right.indices.length === 2
+
+  if (!isMatVec && !isMatMat) return null
+
+  if (isMatVec) {
+    let Wref: TensorRef
+    let Xref: TensorRef
+    if (left.indices.length === 2 && right.indices.length === 1) {
+      Wref = left
+      Xref = right
+    } else {
+      Wref = right
+      Xref = left
+    }
+    const xIdx = Xref.indices[0]!
+    if (Wref.indices[1] !== xIdx) return null
+    const W = dense.get(Wref.name)
+    const X = dense.get(Xref.name)
+    if (!W) throw new Error(`missing dense tensor ${Wref.name}`)
+    if (!X) throw new Error(`missing dense tensor ${Xref.name}`)
+    let Y = matmul(W, X)
+    if (activation) Y = mapDense(Y, activation)
+    return Y
+  }
+
+  // Mat×mat: contract shared middle index
+  // Prefer A[i,j] * B[j,k] (left contracts last with right first)
+  if (left.indices[1] === right.indices[0]) {
+    leftRef = left
+    rightRef = right
+  } else if (right.indices[1] === left.indices[0]) {
+    leftRef = right
+    rightRef = left
   } else {
     return null
   }
 
-  const xIdx = Xref.indices[0]!
-  // MVP matmul: W[m,n] * X[n] — contracted index must be last on W
-  if (Wref.indices[1] !== xIdx) return null
+  const A = dense.get(leftRef.name)
+  const B = dense.get(rightRef.name)
+  if (!A) throw new Error(`missing dense tensor ${leftRef.name}`)
+  if (!B) throw new Error(`missing dense tensor ${rightRef.name}`)
 
-  const W = dense.get(Wref.name)
-  const X = dense.get(Xref.name)
-  if (!W) throw new Error(`missing dense tensor ${Wref.name}`)
-  if (!X) throw new Error(`missing dense tensor ${Xref.name}`)
-
-  let Y = matmul(W, X)
+  let Y = matmul(A, B)
   if (activation) Y = mapDense(Y, activation)
   return Y
 }

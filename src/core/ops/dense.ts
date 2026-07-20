@@ -8,7 +8,11 @@ export function sigmoid(x: number): number {
   return 1 / (1 + Math.exp(-x))
 }
 
-/** W[m,n] * X[n] → Y[m]  or W[m,n] * X[n,p] → Y[m,p] */
+/**
+ * Matrix product:
+ * - W[m,n] × X[n] → Y[m]
+ * - W[m,n] × X[n,p] → Y[m,p]
+ */
 export function matmul(W: DenseTensor, X: DenseTensor): DenseTensor {
   if (W.shape.length === 2 && X.shape.length === 1) {
     const [m, n] = W.shape
@@ -18,6 +22,22 @@ export function matmul(W: DenseTensor, X: DenseTensor): DenseTensor {
       let s = 0
       for (let j = 0; j < n!; j++) s += W.get([i, j]) * X.get([j])
       Y.set([i], s)
+    }
+    return Y
+  }
+  if (W.shape.length === 2 && X.shape.length === 2) {
+    const [m, n] = W.shape
+    const [n2, p] = X.shape
+    if (n !== n2) {
+      throw new Error(`matmul shape: [${m},${n}] × [${n2},${p}]`)
+    }
+    const Y = new DenseTensor([m!, p!])
+    for (let i = 0; i < m!; i++) {
+      for (let k = 0; k < p!; k++) {
+        let s = 0
+        for (let j = 0; j < n!; j++) s += W.get([i, j]) * X.get([j, k])
+        Y.set([i, k], s)
+      }
     }
     return Y
   }

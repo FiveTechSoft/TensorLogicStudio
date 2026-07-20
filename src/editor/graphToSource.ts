@@ -174,7 +174,11 @@ export function synthesizeSourceFromGraph(
         if (inNames[0]) line = `${outName}[i] = softmax(${inNames[0]}[i]).`
       } else if (op.kind === 'einsum' || op.kind === 'equation') {
         if (inNames.length >= 2) {
-          line = `${outName}[i] = ${inNames[0]}[i,j] * ${inNames[1]}[j].`
+          const allDense = out.kind === 'tensor' && ins.every((n) => n.kind === 'tensor')
+          // Matrix product C[i,k] = A[i,j] * B[j,k]  (visual × )
+          line = allDense
+            ? `${outName}[i,k] = ${inNames[0]}[i,j] * ${inNames[1]}[j,k].`
+            : `${outName}[i] = ${inNames[0]}[i,j] * ${inNames[1]}[j].`
         } else if (inNames[0]) {
           line = `${outName}[i] = ${inNames[0]}[i].`
         }
