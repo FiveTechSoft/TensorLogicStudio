@@ -2,10 +2,23 @@ import { nextTensorLabel } from '@/editor/graphToSource'
 import { pushGraphToSource } from '@/editor/pushGraphToSource'
 import { useProjectStore } from '@/store/projectStore'
 import type { GraphNode } from '@/types/project'
+import { getReactFlowInstance, revealNodeInView } from './rfApi'
 
 function placeOffset(nodes: GraphNode[]): { x: number; y: number } {
-  // Keep new boxes in a predictable band near the default fitView origin
-  // so they are not lost off-camera after genealogy/example layouts.
+  const rf = getReactFlowInstance()
+  if (rf) {
+    const pane = document.querySelector('.react-flow') as HTMLElement | null
+    if (pane) {
+      const rect = pane.getBoundingClientRect()
+      const tensors = nodes.filter((n) => n.kind === 'relation' || n.kind === 'tensor')
+      const i = tensors.length
+      const flowPos = rf.screenToFlowPosition({
+        x: rect.left + rect.width * (0.35 + (i % 3) * 0.12),
+        y: rect.top + rect.height * (0.4 + Math.floor(i / 3) * 0.12),
+      })
+      return { x: flowPos.x - 90, y: flowPos.y - 50 }
+    }
+  }
   const tensors = nodes.filter((n) => n.kind === 'relation' || n.kind === 'tensor')
   const i = tensors.length
   return {
@@ -46,8 +59,26 @@ export function addTensorBox(kind: 'relation' | 'tensor' = 'relation'): string {
   s.openSpreadsheet(label, kind === 'relation' ? 'bool' : 'dense')
   useProjectStore.setState({
     skipNextSourceToGraph: true,
-    graphLockUntil: Date.now() + 2000,
+    graphLockUntil: Date.now() + 2500,
     focusNodeId: id,
+  })
+
+  // Bring the box into the visible center of Tensor Graph (critical UX)
+  requestAnimationFrame(() => {
+    revealNodeInView(id)
+    // Keep store position in sync with RF instance after reveal
+    window.setTimeout(() => {
+      const rf = getReactFlowInstance()
+      const rfNode = rf?.getNode(id)
+      if (!rfNode) return
+      const cur = useProjectStore.getState()
+      cur.setGraph(
+        cur.project.graph.nodes.map((n) =>
+          n.id === id ? { ...n, position: { ...rfNode.position } } : n,
+        ),
+        cur.project.graph.edges,
+      )
+    }, 120)
   })
 
   // Sync code after store has the new node
@@ -57,12 +88,12 @@ export function addTensorBox(kind: 'relation' | 'tensor' = 'relation'): string {
         ? `New tensor box ${label} (Boolean) added to graph`
         : `New tensor box ${label} (dense) added to graph`,
     )
-    // Re-assert node still present after source push
     const cur = useProjectStore.getState()
     if (!cur.project.graph.nodes.some((n) => n.id === id)) {
       cur.setGraph([...cur.project.graph.nodes, node], cur.project.graph.edges)
-      useProjectStore.setState({ focusNodeId: id, graphLockUntil: Date.now() + 1500 })
     }
+    window.setTimeout(() => revealNodeInView(id), 50)
+    window.setTimeout(() => revealNodeInView(id), 250)
   })
 
   s.setStatus(`Created tensor ${label}`)

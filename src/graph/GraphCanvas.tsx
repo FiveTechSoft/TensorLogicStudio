@@ -25,6 +25,7 @@ import { pushGraphToSource } from '@/editor/pushGraphToSource'
 import { edgeTypes } from './edgeTypes'
 import { TLNode, kindColor, type TLNodeData } from './nodes/TLNode'
 import { Palette } from './Palette'
+import { setReactFlowInstance } from './rfApi'
 
 /** Logical event-out port for a node kind (Visual Café). */
 function defaultEventOutPort(kind?: NodeKind): string {
@@ -127,45 +128,30 @@ function FitViewOnLoad() {
   const nodeSig = useProjectStore((s) =>
     s.project.graph.nodes.map((n) => n.id).join(','),
   )
-  const { fitView, setCenter, getNode } = useReactFlow()
+  const rf = useReactFlow()
+  const { fitView } = rf
   const nodesInitialized = useNodesInitialized()
 
   useEffect(() => {
+    setReactFlowInstance(rf)
+    return () => setReactFlowInstance(null)
+  }, [rf])
+
+  useEffect(() => {
     if (nodeCount === 0 || !nodesInitialized) return
+    // Don't auto-fit when focusing a brand-new tensor — revealNodeInView handles that
+    if (focusNodeId) return
     const t = window.setTimeout(() => {
       fitView({ padding: 0.3, duration: 200, maxZoom: 1.2 })
     }, 60)
     return () => window.clearTimeout(t)
-  }, [projectId, exampleId, nodeCount, nodeSig, fitView, nodesInitialized])
+  }, [projectId, exampleId, nodeCount, nodeSig, fitView, nodesInitialized, focusNodeId])
 
   useEffect(() => {
-    if (!focusNodeId || !nodesInitialized) return
-    const id = focusNodeId
-    const run = () => {
-      const n = getNode(id)
-      if (n) {
-        fitView({
-          nodes: [{ id }],
-          padding: 0.5,
-          duration: 200,
-          maxZoom: 1.2,
-          minZoom: 0.5,
-        })
-        const w = n.measured?.width ?? 170
-        const h = n.measured?.height ?? 100
-        setCenter(n.position.x + w / 2, n.position.y + h / 2, {
-          zoom: 1,
-          duration: 200,
-        })
-      }
-    }
-    const timers = [50, 200, 400].map((ms) => window.setTimeout(run, ms))
-    const clear = window.setTimeout(() => setFocusNodeId(null), 500)
-    return () => {
-      timers.forEach((t) => window.clearTimeout(t))
-      window.clearTimeout(clear)
-    }
-  }, [focusNodeId, getNode, setCenter, fitView, setFocusNodeId, nodeSig, nodesInitialized])
+    if (!focusNodeId) return
+    const clear = window.setTimeout(() => setFocusNodeId(null), 800)
+    return () => window.clearTimeout(clear)
+  }, [focusNodeId, setFocusNodeId])
 
   return null
 }
