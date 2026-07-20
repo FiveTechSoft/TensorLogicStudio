@@ -1,4 +1,4 @@
-import { useCallback, useMemo, type MouseEvent } from 'react'
+import { useCallback, useEffect, useMemo, type MouseEvent } from 'react'
 import {
   ReactFlow,
   Background,
@@ -6,6 +6,7 @@ import {
   MiniMap,
   applyNodeChanges,
   applyEdgeChanges,
+  useReactFlow,
   type Node,
   type Edge,
   type OnNodesChange,
@@ -112,6 +113,23 @@ function fromRFEdge(e: Edge): GraphEdge {
   }
 }
 
+/** Fit the viewport whenever a project (example) is loaded so A/B boxes are visible. */
+function FitViewOnLoad() {
+  const projectId = useProjectStore((s) => s.project.id)
+  const nodeCount = useProjectStore((s) => s.project.graph.nodes.length)
+  const { fitView } = useReactFlow()
+
+  useEffect(() => {
+    if (nodeCount === 0) return
+    const t = window.setTimeout(() => {
+      fitView({ padding: 0.25, duration: 280, maxZoom: 1.15 })
+    }, 80)
+    return () => window.clearTimeout(t)
+  }, [projectId, nodeCount, fitView])
+
+  return null
+}
+
 export function GraphCanvas() {
   const graph = useProjectStore((s) => s.project.graph)
   const setGraph = useProjectStore((s) => s.setGraph)
@@ -209,10 +227,14 @@ export function GraphCanvas() {
         onConnect={onConnect}
         onNodeClick={onNodeClick}
         fitView
+        fitViewOptions={{ padding: 0.25, maxZoom: 1.15 }}
         proOptions={{ hideAttribution: true }}
         colorMode="dark"
         defaultEdgeOptions={{ type: 'data' }}
+        minZoom={0.3}
+        maxZoom={2}
       >
+        <FitViewOnLoad />
         <Background variant={BackgroundVariant.Dots} gap={18} size={1} color="#1e293b" />
         <Controls className="!bg-slate-900 !border-slate-700 !shadow-none" />
         <MiniMap

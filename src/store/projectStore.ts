@@ -104,7 +104,9 @@ export const useProjectStore = create<ProjectState>((set) => ({
       queryBindings: [],
       lastRun: null,
       spreadsheet: null,
-      skipNextSourceToGraph: false,
+      // Keep the project graph (examples have intentional layouts).
+      // Otherwise source→graph rebuild would wipe A/B boxes on load.
+      skipNextSourceToGraph: true,
     }),
   setSelected: (id) =>
     set((s) => ({ project: { ...s.project, ui: { ...s.project.ui, selectedId: id } } })),

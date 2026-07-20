@@ -1,17 +1,25 @@
 import type { Project } from '@/types/project'
 
 /**
- * C = A × B  (matrix product)
+ * C = A × B
  *
- * Visual layout (Tensor Graph):
- *   [ A ] ──(×)──► [ B ]     two matrix boxes + labeled multiply edge
- *              ╲
- *               ──► [ × ] ──► [ C ]   explicit product node (also wired)
+ * Central column layout (must be visible on load):
  *
- * We emphasize the two-box + (×) edge the user asked for, and keep C as result.
+ *     ┌─────────┐         ┌─────────┐
+ *     │  A 2×2  │ ──(×)──►│  B 2×2  │
+ *     └─────────┘         └─────────┘
+ *              \           /
+ *               \         /
+ *                ▼       ▼
+ *                 [  ×  ]
+ *                    │
+ *                    ▼
+ *                 ┌─────┐
+ *                 │  C  │
+ *                 └─────┘
  */
 
-const SOURCE = `% Matrix multiply demo: C = A × B
+const SOURCE = `% Matrix multiply: C = A × B
 % @tensor dense A
 % @tensor dense B
 % @tensor dense C
@@ -32,29 +40,31 @@ export const matrixMultiplyProject: Project = {
         id: 'tensor:A',
         kind: 'tensor',
         label: 'A',
-        position: { x: 40, y: 120 },
+        // Prominent center-left
+        position: { x: 80, y: 140 },
         data: {
           role: 'factor',
           shape: [2, 2],
-          caption: '2×2',
+          caption: 'matrix 2×2',
         },
       },
       {
         id: 'tensor:B',
         kind: 'tensor',
         label: 'B',
-        position: { x: 320, y: 120 },
+        // Prominent center-right — same row as A so both “cajas” are obvious
+        position: { x: 380, y: 140 },
         data: {
           role: 'factor',
           shape: [2, 2],
-          caption: '2×2',
+          caption: 'matrix 2×2',
         },
       },
       {
         id: 'op-mul',
         kind: 'einsum',
         label: '×',
-        position: { x: 180, y: 280 },
+        position: { x: 250, y: 300 },
         data: {
           op: 'matmul',
           symbol: '×',
@@ -64,7 +74,7 @@ export const matrixMultiplyProject: Project = {
         id: 'tensor:C',
         kind: 'tensor',
         label: 'C',
-        position: { x: 180, y: 420 },
+        position: { x: 220, y: 420 },
         data: {
           role: 'product',
           shape: [2, 2],
@@ -75,19 +85,12 @@ export const matrixMultiplyProject: Project = {
         id: 'ex-run',
         kind: 'run',
         label: 'Run',
-        position: { x: 480, y: 40 },
-        data: {},
-      },
-      {
-        id: 'ex-matrix',
-        kind: 'matrixView',
-        label: 'Matrix View',
-        position: { x: 480, y: 140 },
+        position: { x: 560, y: 40 },
         data: {},
       },
     ],
     edges: [
-      // The signature edge: A ──(×)──► B  (two boxes joined by multiply)
+      // Signature visual: two boxes joined by (×)
       {
         id: 'e-a-b-mul',
         kind: 'data',
@@ -97,7 +100,6 @@ export const matrixMultiplyProject: Project = {
         targetHandle: 'data-in',
         label: '×',
       },
-      // Dataflow into product: A,B → × → C
       {
         id: 'e-a-op',
         kind: 'data',
@@ -145,11 +147,8 @@ export const matrixMultiplyProject: Project = {
     updatedAt: now,
     exampleId: 'matmul',
     denseSeeds: {
-      // A = [[1, 2], [3, 4]]
       A: { shape: [2, 2], data: [1, 2, 3, 4] },
-      // B = [[5, 6], [7, 8]]
       B: { shape: [2, 2], data: [5, 6, 7, 8] },
-      // C filled on Run: [[19, 22], [43, 50]]
     },
   },
 }

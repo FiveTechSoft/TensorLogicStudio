@@ -83,10 +83,17 @@ export function TLNode({ data }: NodeProps<TLRFNode>) {
     )
   }
 
+  const isMatrixBox =
+    kind === 'tensor' &&
+    (data.role === 'factor' || data.role === 'product' || caption != null)
+
   return (
     <div
-      className="min-w-[140px] rounded-md border bg-[#0c1424]/95 px-3 py-2 shadow-lg shadow-black/30"
-      style={{ borderColor: color }}
+      className={[
+        'rounded-lg border bg-[#0c1424]/95 shadow-lg shadow-black/30',
+        isMatrixBox ? 'min-w-[160px] min-h-[88px] px-4 py-3' : 'min-w-[140px] px-3 py-2',
+      ].join(' ')}
+      style={{ borderColor: color, borderWidth: isMatrixBox ? 2 : 1 }}
     >
       <Handle
         type="target"
@@ -103,7 +110,13 @@ export function TLNode({ data }: NodeProps<TLRFNode>) {
         title="event-in"
       />
 
-      <div className="text-sm font-medium text-slate-100 truncate" title={label}>
+      <div
+        className={[
+          'font-medium text-slate-100 truncate',
+          isMatrixBox ? 'text-lg tracking-wide' : 'text-sm',
+        ].join(' ')}
+        title={label}
+      >
         {label}
       </div>
       <div
@@ -112,6 +125,16 @@ export function TLNode({ data }: NodeProps<TLRFNode>) {
       >
         {caption ?? kind}
       </div>
+      {isMatrixBox && Array.isArray(data.shape) && (
+        <div className="mt-2 grid grid-cols-2 gap-0.5 opacity-80">
+          {Array.from({ length: 4 }, (_, i) => (
+            <div
+              key={i}
+              className="h-4 rounded-sm bg-slate-800/90 border border-slate-700/80"
+            />
+          ))}
+        </div>
+      )}
 
       <Handle
         type="source"
