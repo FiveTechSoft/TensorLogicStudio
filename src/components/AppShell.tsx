@@ -5,20 +5,13 @@ import { ConsolePanel } from './ConsolePanel'
 import { CodeEditor } from '@/editor/CodeEditor'
 import { graphFromSource } from '@/editor/syncFromSource'
 import { GraphCanvas } from '@/graph/GraphCanvas'
+import { PropertiesPanel } from '@/inspector/PropertiesPanel'
 import { useProjectStore } from '@/store/projectStore'
 
 function PaneHeader({ children }: { children: ReactNode }) {
   return (
     <div className="text-[10px] uppercase tracking-widest text-slate-500 px-3 py-2 border-b border-slate-800/80 shrink-0">
       {children}
-    </div>
-  )
-}
-
-function PanePlaceholder({ label }: { label: string }) {
-  return (
-    <div className="flex-1 flex items-center justify-center text-slate-600 text-sm">
-      {label}
     </div>
   )
 }
@@ -71,7 +64,7 @@ export function AppShell() {
 
         <section className="min-h-0 flex flex-col bg-[#0c1424]/80">
           <PaneHeader>Inspector</PaneHeader>
-          <PanePlaceholder label="Properties & matrices" />
+          <PropertiesPanel />
         </section>
       </div>
 
