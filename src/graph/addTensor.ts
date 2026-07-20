@@ -1,8 +1,18 @@
 import { nextTensorLabel } from '@/editor/graphToSource'
 import { pushGraphToSource } from '@/editor/pushGraphToSource'
+import {
+  createInitMatrix,
+  defaultDomainLabels,
+  matrixToRowMajor,
+  type InitMode,
+} from '@/core/tensor/initMatrix'
+import { rewriteRelationFacts } from '@/core/source/rewriteRelationFacts'
 import { useProjectStore } from '@/store/projectStore'
+import { ideRuntime } from '@/runtime/ideRuntime'
 import type { GraphNode } from '@/types/project'
 import { getReactFlowInstance } from './rfApi'
+
+export type { InitMode }
 
 function placeOffset(nodes: GraphNode[]): { x: number; y: number } {
   const tensors = nodes.filter((n) => n.kind === 'relation' || n.kind === 'tensor')
@@ -12,7 +22,6 @@ function placeOffset(nodes: GraphNode[]): { x: number; y: number } {
       ? (document.querySelector('.react-flow') as HTMLElement | null)
       : null
 
-  // First tensor: left side of visible pane
   if (tensors.length === 0 && rf && pane) {
     const rect = pane.getBoundingClientRect()
     const flowPos = rf.screenToFlowPosition({
@@ -22,7 +31,6 @@ function placeOffset(nodes: GraphNode[]): { x: number; y: number } {
     return { x: flowPos.x - 90, y: flowPos.y - 50 }
   }
 
-  // Next tensors: always to the RIGHT of the rightmost tensor (gap for arrows)
   if (tensors.length > 0) {
     const rightmost = tensors.reduce((a, b) =>
       a.position.x >= b.position.x ? a : b,
@@ -36,19 +44,46 @@ function placeOffset(nodes: GraphNode[]): { x: number; y: number } {
   return { x: 80, y: 140 }
 }
 
+export interface AddTensorOptions {
+  kind?: 'relation' | 'tensor'
+  /** zeros (default) or random values */
+  init?: InitMode
+  /** Domain size for bool / side length for dense square (default 4 bool / 2 dense) */
+  size?: number
+}
+
 /**
- * Add a visible tensor box to the central graph and update Monaco source.
+ * Add a visible tensor box, optionally initialized with zeros or random values.
  * Returns the new node id.
  */
-export function addTensorBox(kind: 'relation' | 'tensor' = 'relation'): string {
+export function addTensorBox(
+  kindOrOpts: 'relation' | 'tensor' | AddTensorOptions = 'relation',
+  initArg?: InitMode,
+): string {
+  const opts: AddTensorOptions =
+    typeof kindOrOpts === 'string'
+      ? { kind: kindOrOpts, init: initArg ?? 'zeros' }
+      : { kind: 'relation', init: 'zeros', ...kindOrOpts }
+
+  const kind = opts.kind ?? 'relation'
+  const init = opts.init ?? 'zeros'
+  const size = opts.size ?? (kind === 'relation' ? 4 : 2)
+
   const s = useProjectStore.getState()
   const { nodes, edges } = s.project.graph
   const label = nextTensorLabel(nodes, kind)
-  // No colons in ids — React Flow uses CSS selectors for edge endpoints
   const baseId = kind === 'relation' ? `relation-${label}` : `tensor-${label}`
   const id = nodes.some((n) => n.id === baseId)
     ? `${baseId}-${crypto.randomUUID().slice(0, 8)}`
     : baseId
+
+  const shape: [number, number] = [size, size]
+  const matrix = createInitMatrix(
+    init,
+    size,
+    size,
+    kind === 'relation' ? 'bool' : 'dense',
+  )
 
   const node: GraphNode = {
     id,
@@ -58,8 +93,12 @@ export function addTensorBox(kind: 'relation' | 'tensor' = 'relation'): string {
     data: {
       createdVisually: true,
       role: 'factor',
-      caption: kind === 'relation' ? 'tensor (bool)' : 'tensor (dense)',
-      shape: [2, 2],
+      caption:
+        kind === 'relation'
+          ? `bool · ${init}`
+          : `dense · ${init}`,
+      shape,
+      init,
     },
   }
 
@@ -73,7 +112,22 @@ export function addTensorBox(kind: 'relation' | 'tensor' = 'relation'): string {
     focusNodeId: id,
   })
 
-  // Fit all tensor boxes into view (do NOT re-center every new box on the same spot)
+  // Apply initialization to source / dense seeds
+  if (kind === 'relation') {
+    const labels = defaultDomainLabels(size)
+    const nextSource = rewriteRelationFacts(
+      s.project.source,
+      label,
+      labels,
+      matrix,
+    )
+    s.setSourceFromGraph(nextSource)
+  } else {
+    const data = matrixToRowMajor(matrix)
+    s.setDenseSeed(label, { shape: [...shape], data })
+    ideRuntime.seedDense(label, [...shape], data)
+  }
+
   const reveal = () => {
     const rf = getReactFlowInstance()
     if (!rf) return
@@ -99,12 +153,9 @@ export function addTensorBox(kind: 'relation' | 'tensor' = 'relation'): string {
     window.setTimeout(reveal, 150)
   }
 
-  // Sync code after store has the new node
   queueMicrotask(() => {
     pushGraphToSource(
-      kind === 'relation'
-        ? `New tensor box ${label} (Boolean) added to graph`
-        : `New tensor box ${label} (dense) added to graph`,
+      `New tensor ${label} (${kind === 'relation' ? 'bool' : 'dense'}, ${init})`,
     )
     const cur = useProjectStore.getState()
     if (!cur.project.graph.nodes.some((n) => n.id === id)) {
@@ -115,7 +166,9 @@ export function addTensorBox(kind: 'relation' | 'tensor' = 'relation'): string {
     }
   })
 
-  s.setStatus(`Created tensor ${label}`)
-  s.appendConsole(`+ New Tensor → ${label} on canvas`)
+  s.setStatus(`Created ${label} · init=${init}`)
+  s.appendConsole(
+    `+ New Tensor ${label} (${kind === 'relation' ? 'BOOL' : 'dense'}, ${init})`,
+  )
   return id
 }

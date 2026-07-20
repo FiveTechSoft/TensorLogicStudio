@@ -3,6 +3,7 @@ import {
   extractRelationSheet,
   rewriteRelationFacts,
 } from '@/core/source/rewriteRelationFacts'
+import { createInitMatrix } from '@/core/tensor/initMatrix'
 import { pushGraphToSource } from '@/editor/pushGraphToSource'
 import { useProjectStore } from '@/store/projectStore'
 import { ideRuntime } from '@/runtime/ideRuntime'
@@ -382,6 +383,50 @@ export function TensorSpreadsheet({
             + Column
           </button>
         )}
+        <button
+          type="button"
+          onClick={() => {
+            const rows = Math.max(1, matrix.length)
+            const cols = Math.max(1, matrix[0]?.length ?? rows)
+            const next = createInitMatrix(
+              'zeros',
+              rows,
+              cols,
+              mode === 'bool' ? 'bool' : 'dense',
+            )
+            setMatrix(next)
+            if (mode === 'bool') applyBool(labels, next)
+            else applyDense(next)
+          }}
+          className="text-[11px] px-2 py-1 rounded border border-slate-700 text-slate-300 hover:bg-slate-800"
+          title="Fill all cells with 0"
+        >
+          Fill zeros
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            const rows = Math.max(1, matrix.length)
+            const cols = Math.max(1, matrix[0]?.length ?? rows)
+            const next = createInitMatrix(
+              'random',
+              rows,
+              cols,
+              mode === 'bool' ? 'bool' : 'dense',
+            )
+            setMatrix(next)
+            if (mode === 'bool') applyBool(labels, next)
+            else applyDense(next)
+          }}
+          className="text-[11px] px-2 py-1 rounded border border-violet-800/50 text-violet-300/90 hover:bg-violet-950/40"
+          title={
+            mode === 'bool'
+              ? 'Random 0/1 facts (~35% ones)'
+              : 'Random floats in [-1, 1]'
+          }
+        >
+          Fill random
+        </button>
         <button
           type="button"
           onClick={() => {
