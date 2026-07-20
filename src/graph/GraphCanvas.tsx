@@ -42,6 +42,8 @@ function toRFNode(n: GraphNode, selectedId?: string): Node<TLNodeData> {
     type: 'tl',
     position: n.position,
     selected: selectedId != null && n.id === selectedId,
+    connectable: true,
+    draggable: true,
     data: {
       label: n.label,
       kind: n.kind,
@@ -259,25 +261,16 @@ export function GraphCanvas() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [setGraph, setSelected])
 
-  const isValidConnection: IsValidConnection = useCallback(
-    (connection: Connection | Edge) => {
-      if (!connection.source || !connection.target) return false
-      if (connection.source === connection.target) return false
-      // Event ports hidden for now — only data connections
-      const sh = connection.sourceHandle ?? ''
-      const th = connection.targetHandle ?? ''
-      if (sh.includes('event') || th.includes('event')) return false
-      return true
-    },
-    [],
-  )
+  // Accept any source→target pair on different nodes (handles are data-only).
+  const isValidConnection: IsValidConnection = useCallback((c: Connection | Edge) => {
+    return Boolean(c.source && c.target && c.source !== c.target)
+  }, [])
 
   const onConnect: OnConnect = useCallback(
     (connection) => {
       if (!connection.source || !connection.target) return
       if (connection.source === connection.target) return
 
-      // Latest graph from store (avoid stale closure wiping concurrent adds)
       const state = useProjectStore.getState()
       const nodesNow = state.project.graph.nodes
       const edgesNow = state.project.graph.edges
@@ -285,37 +278,49 @@ export function GraphCanvas() {
       const sourceNode = nodesNow.find((n) => n.id === connection.source)
       const targetNode = nodesNow.find((n) => n.id === connection.target)
 
-      // Data-only mode (no Visual Café event ports on canvas for now)
-      const kind: EdgeKind = 'data'
-      const sourceHandle = 'data-out'
-      const targetHandle = 'data-in'
+      const sourceHandle = connection.sourceHandle || 'data-out'
+      const targetHandle = connection.targetHandle || 'data-in'
 
       const dup = edgesNow.some(
         (e) =>
           e.source === connection.source &&
           e.target === connection.target &&
-          e.kind === kind,
+          e.kind === 'data',
       )
-      if (dup) return
+      if (dup) {
+        useProjectStore.getState().setStatus('Ya existe esa flecha')
+        return
+      }
 
       const edge: GraphEdge = {
         id: `e-${crypto.randomUUID()}`,
-        kind,
-        source: connection.source!,
-        target: connection.target!,
+        kind: 'data',
+        source: connection.source,
+        target: connection.target,
         sourceHandle,
         targetHandle,
         label: '→',
       }
       setGraph(nodesNow, [...edgesNow, edge])
-      useProjectStore.getState().setStatus(
-        `Flecha de datos: ${sourceNode?.label ?? '?'} → ${targetNode?.label ?? '?'}`,
-      )
+      useProjectStore.setState({
+        graphLockUntil: Date.now() + 2000,
+        skipNextSourceToGraph: true,
+      })
+      useProjectStore
+        .getState()
+        .setStatus(
+          `Flecha: ${sourceNode?.label ?? '?'} → ${targetNode?.label ?? '?'}`,
+        )
+      useProjectStore
+        .getState()
+        .appendConsole(
+          `Arrow ${sourceNode?.label ?? connection.source} → ${targetNode?.label ?? connection.target}`,
+        )
 
       queueMicrotask(() => {
-        const srcL = sourceNode?.label ?? connection.source
-        const tgtL = targetNode?.label ?? connection.target
-        pushGraphToSource(`Wired ${srcL} → ${tgtL} → code updated`)
+        pushGraphToSource(
+          `Wired ${sourceNode?.label ?? connection.source} → ${targetNode?.label ?? connection.target}`,
+        )
       })
     },
     [setGraph],
@@ -349,11 +354,14 @@ export function GraphCanvas() {
         fitViewOptions={{ padding: 0.25, maxZoom: 1.15 }}
         proOptions={{ hideAttribution: true }}
         colorMode="dark"
+        // Loose: source handle can connect to any target handle
         connectionMode={ConnectionMode.Loose}
-        connectionRadius={28}
-        connectionLineStyle={{ stroke: '#38bdf8', strokeWidth: 2.5 }}
+        // Larger snap radius so dropping on the blue port is easy
+        connectionRadius={40}
+        connectionLineStyle={{ stroke: '#38bdf8', strokeWidth: 3 }}
         defaultEdgeOptions={{
           type: 'data',
+          animated: false,
           markerEnd: {
             type: MarkerType.ArrowClosed,
             color: '#38bdf8',
@@ -363,14 +371,29 @@ export function GraphCanvas() {
         }}
         minZoom={0.3}
         maxZoom={2}
+        // Left-drag on empty pane pans; handles still start connections
+        // Middle/right pan is also enabled; space+drag works via RF defaults
+        panOnDrag
+        panOnScroll
+        selectionOnDrag={false}
+        selectNodesOnDrag={false}
         nodesDraggable
         nodesConnectable
         elementsSelectable
         edgesFocusable
         nodesFocusable
+        edgesReconnectable={false}
         deleteKeyCode={['Backspace', 'Delete']}
         onlyRenderVisibleElements={false}
+        elevateNodesOnSelect
         style={{ width: '100%', height: '100%' }}
+        onConnectStart={(_, { handleType }) => {
+          if (handleType === 'source') {
+            useProjectStore
+              .getState()
+              .setStatus('Arrastra hasta el punto azul de otra caja…')
+          }
+        }}
       >
         <FitViewOnLoad />
         <Background variant={BackgroundVariant.Dots} gap={18} size={1} color="#1e293b" />

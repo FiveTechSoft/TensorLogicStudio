@@ -26,22 +26,41 @@ html, body, #root {
   visibility: visible !important;
 }
 
-/* Larger, easier to grab connection ports */
+/* Connection ports must sit above the card and receive pointer events */
+.react-flow__node {
+  overflow: visible !important;
+}
+
 .react-flow__handle {
   opacity: 1 !important;
   pointer-events: all !important;
+  cursor: crosshair !important;
+}
+
+.react-flow__handle-left {
+  left: -9px !important;
+}
+
+.react-flow__handle-right {
+  right: -9px !important;
 }
 
 .react-flow__handle-connecting {
   background: #fbbf24 !important;
+  box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.35) !important;
 }
 
 .react-flow__handle-valid {
   background: #4ade80 !important;
+  box-shadow: 0 0 0 4px rgba(74, 222, 128, 0.35) !important;
 }
 
 .react-flow__connection-path {
   stroke: #38bdf8 !important;
+  stroke-width: 3 !important;
+}
+
+.react-flow__edge-path {
   stroke-width: 2.5 !important;
 }
 

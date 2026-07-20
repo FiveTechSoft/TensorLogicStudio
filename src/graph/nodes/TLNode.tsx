@@ -36,38 +36,41 @@ export function kindColor(kind: string): string {
   return KIND_COLORS[kind] ?? '#64748b'
 }
 
-const handleBase: CSSProperties = {
-  width: 14,
-  height: 14,
-  border: '2px solid #0b1220',
-  borderRadius: 999,
-  zIndex: 10,
-}
-
-/** Blue = TensorLogic dataflow only (event ports hidden for now). */
+/** Blue data ports — large and outside the box so they are easy to drag. */
 function DataHandle(props: {
   type: 'source' | 'target'
   position: Position
   id: string
-  style?: CSSProperties
 }) {
+  const isSource = props.type === 'source'
   return (
     <Handle
       type={props.type}
       position={props.position}
       id={props.id}
+      isConnectable
+      isConnectableStart={isSource}
+      isConnectableEnd={!isSource}
       title={
-        props.type === 'source'
-          ? 'Salida de datos — arrastra a otro tensor u operación'
-          : 'Entrada de datos — suelta la flecha aquí'
+        isSource
+          ? 'Salida — mantén pulsado y arrastra hasta el punto azul de otra caja'
+          : 'Entrada — suelta aquí la flecha'
       }
-      className="!border-2 !border-slate-950 hover:!scale-125 transition-transform"
-      style={{
-        ...handleBase,
-        background: '#38bdf8',
-        boxShadow: '0 0 0 2px rgba(56,189,248,0.35)',
-        ...props.style,
-      }}
+      style={
+        {
+          width: 18,
+          height: 18,
+          background: '#38bdf8',
+          border: '3px solid #0b1220',
+          borderRadius: 999,
+          zIndex: 20,
+          // Pull handle outside the card so it is easy to grab
+          ...(props.position === Position.Left ? { left: -9 } : {}),
+          ...(props.position === Position.Right ? { right: -9 } : {}),
+          ...(props.position === Position.Top ? { top: -9 } : {}),
+          ...(props.position === Position.Bottom ? { bottom: -9 } : {}),
+        } as CSSProperties
+      }
     />
   )
 }
@@ -87,15 +90,15 @@ export function TLNode({ data }: NodeProps<TLRFNode>) {
   if (isMul) {
     return (
       <div
-        className="flex h-12 w-12 items-center justify-center rounded-full border-2 bg-amber-950 shadow-lg shadow-amber-950/50"
-        style={{ borderColor: '#fbbf24' }}
+        className="flex h-12 w-12 items-center justify-center rounded-full border-2 bg-amber-950 shadow-lg relative"
+        style={{ borderColor: '#fbbf24', overflow: 'visible' }}
         title="Matrix multiply ×"
       >
         <DataHandle type="target" position={Position.Left} id="data-in" />
-        <span className="text-xl font-bold text-amber-300 leading-none">×</span>
+        <span className="text-xl font-bold text-amber-300 leading-none pointer-events-none">
+          ×
+        </span>
         <DataHandle type="source" position={Position.Right} id="data-out" />
-        <DataHandle type="target" position={Position.Top} id="data-in-top" />
-        <DataHandle type="source" position={Position.Bottom} id="data-out-bottom" />
       </div>
     )
   }
@@ -118,21 +121,17 @@ export function TLNode({ data }: NodeProps<TLRFNode>) {
       style={{
         borderColor: color,
         borderWidth: isMatrixBox ? 2 : 1,
+        overflow: 'visible',
         boxShadow: isMatrixBox
           ? `0 0 0 1px ${color}33, 0 8px 24px rgba(0,0,0,0.45)`
           : undefined,
       }}
     >
-      <DataHandle
-        type="target"
-        position={Position.Left}
-        id="data-in"
-        style={{ top: '50%' }}
-      />
+      <DataHandle type="target" position={Position.Left} id="data-in" />
 
       <div
         className={[
-          'font-medium text-slate-100 truncate',
+          'font-medium text-slate-100 truncate pointer-events-none',
           isMatrixBox ? 'text-lg tracking-wide' : 'text-sm',
         ].join(' ')}
         title={label}
@@ -140,13 +139,13 @@ export function TLNode({ data }: NodeProps<TLRFNode>) {
         {label}
       </div>
       <div
-        className="text-[10px] uppercase tracking-wider mt-0.5 truncate"
+        className="text-[10px] uppercase tracking-wider mt-0.5 truncate pointer-events-none"
         style={{ color }}
       >
         {caption ?? kind}
       </div>
       {isMatrixBox && Array.isArray(data.shape) && (
-        <div className="mt-2 grid grid-cols-2 gap-0.5 opacity-80">
+        <div className="mt-2 grid grid-cols-2 gap-0.5 opacity-80 pointer-events-none">
           {Array.from({ length: 4 }, (_, i) => (
             <div
               key={i}
@@ -156,12 +155,7 @@ export function TLNode({ data }: NodeProps<TLRFNode>) {
         </div>
       )}
 
-      <DataHandle
-        type="source"
-        position={Position.Right}
-        id="data-out"
-        style={{ top: '50%' }}
-      />
+      <DataHandle type="source" position={Position.Right} id="data-out" />
     </div>
   )
 }
