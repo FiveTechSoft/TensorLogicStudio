@@ -7,7 +7,10 @@ import { getReactFlowInstance } from './rfApi'
 function placeOffset(nodes: GraphNode[]): { x: number; y: number } {
   const tensors = nodes.filter((n) => n.kind === 'relation' || n.kind === 'tensor')
   const rf = getReactFlowInstance()
-  const pane = document.querySelector('.react-flow') as HTMLElement | null
+  const pane =
+    typeof document !== 'undefined'
+      ? (document.querySelector('.react-flow') as HTMLElement | null)
+      : null
 
   // First tensor: left side of visible pane
   if (tensors.length === 0 && rf && pane) {
