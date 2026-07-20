@@ -6,6 +6,7 @@ import { DenseTensor } from '../tensor/Tensor'
 import type { SparseBoolTensor } from '../tensor/Tensor'
 import { forwardChain, seedRelations } from './forward'
 import { queryRelation } from './query'
+import { evaluateEquations, seedDenseTensor, trainStep } from './train'
 
 export interface RunResult {
   fixpoint: boolean
@@ -29,13 +30,22 @@ export class Runtime {
     this.program = parse(source)
     this.ir = buildIr(this.program)
     this.relations = seedRelations(this.ir.facts, this.ir.relationRanks)
-    this.dense = new Map()
+    // Preserve seeded (and previously computed) dense tensors across reloads.
+    // Only sparse relations are rebuilt from facts.
     this.traces = []
     this.lastFixpoint = false
     this.traces.push({
       iteration: 0,
-      message: `loaded ${this.ir.facts.length} facts, ${this.ir.rules.length} rules`,
+      message: `loaded ${this.ir.facts.length} facts, ${this.ir.rules.length} rules, ${this.ir.equations.length} equation(s)`,
     })
+  }
+
+  /**
+   * Seed a dense tensor with row-major values.
+   * Survives subsequent `loadSource` calls so examples can seed then load equations.
+   */
+  seedDense(name: string, shape: number[], rowMajorValues: number[]): void {
+    this.dense.set(name, seedDenseTensor(shape, rowMajorValues))
   }
 
   run(opts: { mode: RunMode }): RunResult {
@@ -58,6 +68,15 @@ export class Runtime {
         },
       })
       this.lastFixpoint = result.fixpoint
+
+      if (this.ir.equations.length > 0) {
+        evaluateEquations(this.ir.equations, this.dense)
+        this.traces.push({
+          iteration: result.iterations,
+          message: `evaluated ${this.ir.equations.length} dense equation(s)`,
+        })
+      }
+
       const ms = performance.now() - t0
       this.traces.push({
         iteration: result.iterations,
@@ -75,7 +94,14 @@ export class Runtime {
       return this.run({ mode: 'forward' })
     }
 
-    // train-step reserved for Task 8
+    // train-step: re-evaluate dense equations (minimal path)
+    if (this.ir.equations.length > 0) {
+      trainStep(this.ir.equations, this.dense)
+      this.traces.push({
+        iteration: 0,
+        message: `train-step: evaluated ${this.ir.equations.length} equation(s)`,
+      })
+    }
     const ms = performance.now() - t0
     return { fixpoint: this.lastFixpoint, iterations: 0, ms }
   }
