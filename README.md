@@ -28,6 +28,12 @@ npm test          # unit + integration suite
 npm run build     # production build → dist/
 ```
 
+## Live demo (GitHub Pages)
+
+**https://fivetechsoft.github.io/TensorLogicStudio/**
+
+Deploys automatically from `main` via GitHub Actions (`.github/workflows/deploy-pages.yml`).
+
 ## How to use
 
 1. **Load the genealogy demo:** toolbar **Examples → Genealogy** (loaded by default on first visit).
