@@ -9,9 +9,12 @@ import { InspectorPanel } from '@/inspector/InspectorPanel'
 import { useProjectStore } from '@/store/projectStore'
 import { wireEventEdges } from '@/core/events/wireGraph'
 import type { GraphNode } from '@/types/project'
+import { genealogyProject } from '@/examples/genealogy'
+import { loadSession, saveSession } from '@/persistence/fileIo'
 import {
   ideBus,
   ideRuntime,
+  loadProjectIntoIde,
   publishInspector,
   runAndPublish,
   stepAndPublish,
@@ -141,7 +144,33 @@ function useEventEdgeWiring() {
   }, [nodes, edges])
 }
 
+/** Restore last session from localStorage, or load the genealogy example. */
+function useInitialProjectLoad() {
+  useEffect(() => {
+    const session = loadSession()
+    if (session && typeof session.source === 'string' && session.graph) {
+      loadProjectIntoIde(session)
+    } else {
+      loadProjectIntoIde(structuredClone(genealogyProject))
+    }
+  }, [])
+}
+
+/** Debounced autosave of the current project into localStorage. */
+function useSessionAutosave() {
+  const project = useProjectStore((s) => s.project)
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      saveSession(project)
+    }, 500)
+    return () => window.clearTimeout(handle)
+  }, [project])
+}
+
 export function AppShell() {
+  useInitialProjectLoad()
+  useSessionAutosave()
   useSourceToGraphSync()
   useEventEdgeWiring()
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { useProjectStore } from '@/store/projectStore'
 import { genealogyProject } from '@/examples/genealogy'
 import { mlpProject } from '@/examples/mlp'
@@ -9,6 +9,7 @@ import {
   stopRuntime,
   type InspectorActions,
 } from '@/runtime/ideRuntime'
+import { downloadProject, openProjectFile, saveSession } from '@/persistence/fileIo'
 import type { Project } from '@/types/project'
 
 const btnClass =
@@ -32,6 +33,7 @@ export function Toolbar() {
   const projectName = useProjectStore((s) => s.project.name)
   const [examplesOpen, setExamplesOpen] = useState(false)
   const examplesRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!examplesOpen) return
@@ -71,6 +73,34 @@ export function Toolbar() {
 
   const handleStop = () => {
     stopRuntime(inspectorActionsFromStore())
+  }
+
+  const handleSave = () => {
+    const project = useProjectStore.getState().project
+    downloadProject(project)
+    saveSession(project)
+  }
+
+  const handleLoadClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    // Allow re-selecting the same file later.
+    e.target.value = ''
+    if (!file) return
+    try {
+      const project = await openProjectFile(file)
+      loadProjectIntoIde(project)
+      saveSession(project)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      const s = useProjectStore.getState()
+      s.setParseError(msg)
+      s.setStatus(`Load failed: ${msg}`)
+      s.appendConsole(`Load failed: ${msg}`)
+    }
   }
 
   const loadExample = (project: Project) => {
@@ -136,12 +166,19 @@ export function Toolbar() {
             </div>
           )}
         </div>
-        <button type="button" className={btnClass} onClick={() => {}}>
+        <button type="button" className={btnClass} onClick={handleSave}>
           Save
         </button>
-        <button type="button" className={btnClass} onClick={() => {}}>
+        <button type="button" className={btnClass} onClick={handleLoadClick}>
           Load
         </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json,.tls.json,application/json"
+          className="hidden"
+          onChange={handleFileChange}
+        />
       </div>
     </header>
   )
