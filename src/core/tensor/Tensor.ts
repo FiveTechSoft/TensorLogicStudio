@@ -4,7 +4,10 @@ function keyOf(tuple: string[]): string {
 
 export class SparseBoolTensor {
   private data = new Set<string>()
-  constructor(public readonly rank: number) {}
+  readonly rank: number
+  constructor(rank: number) {
+    this.rank = rank
+  }
 
   add(tuple: string[]): void {
     if (tuple.length !== this.rank) throw new Error(`rank ${this.rank}, got ${tuple.length}`)
@@ -36,10 +39,9 @@ export class SparseBoolTensor {
 
 export class DenseTensor {
   data: Float64Array
-  constructor(
-    public shape: number[],
-    fill = 0,
-  ) {
+  shape: number[]
+  constructor(shape: number[], fill = 0) {
+    this.shape = shape
     const n = shape.reduce((a, b) => a * b, 1)
     this.data = new Float64Array(n)
     if (fill !== 0) this.data.fill(fill)
