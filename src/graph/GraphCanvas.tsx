@@ -40,15 +40,21 @@ const nodeTypes: NodeTypes = {
 function toRFNode(n: GraphNode, selectedId?: string): Node<TLNodeData> {
   // Flatten payload so TLNode can read role/caption/shape from data.*
   // Explicit width/height help React Flow compute edge paths immediately.
+  const isFrame =
+    n.data.variant === 'frame' || n.data.frame === true
+  const frameW = typeof n.data.frameW === 'number' ? n.data.frameW : 420
+  const frameH = typeof n.data.frameH === 'number' ? n.data.frameH : 200
   return {
     id: n.id,
     type: 'tl',
     position: n.position,
     selected: selectedId != null && n.id === selectedId,
-    connectable: true,
+    connectable: !isFrame,
     draggable: true,
-    width: 180,
-    height: 110,
+    selectable: !isFrame,
+    width: isFrame ? frameW : 180,
+    height: isFrame ? frameH : 110,
+    zIndex: isFrame ? -1 : undefined,
     data: {
       label: n.label,
       kind: n.kind,

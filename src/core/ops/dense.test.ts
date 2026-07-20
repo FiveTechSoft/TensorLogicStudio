@@ -1,5 +1,5 @@
 import { DenseTensor } from '../tensor/Tensor'
-import { matmul, relu, sigmoid } from './dense'
+import { matmul, relu, sigmoid, softmaxDense } from './dense'
 import { describe, it, expect } from 'vitest'
 
 describe('dense', () => {
@@ -33,5 +33,17 @@ describe('dense', () => {
     expect(relu(-1)).toBe(0)
     expect(relu(2)).toBe(2)
     expect(sigmoid(0)).toBeCloseTo(0.5)
+  })
+
+  it('softmaxDense row-wise on 2×3', () => {
+    const t = new DenseTensor([2, 3])
+    t.data.set([1, 2, 3, 1, 1, 1])
+    const s = softmaxDense(t)
+    const row0 = [s.get([0, 0]), s.get([0, 1]), s.get([0, 2])]
+    const sum0 = row0.reduce((a, b) => a + b, 0)
+    expect(sum0).toBeCloseTo(1)
+    expect(row0[2]!).toBeGreaterThan(row0[0]!)
+    const row1 = [s.get([1, 0]), s.get([1, 1]), s.get([1, 2])]
+    expect(row1[0]).toBeCloseTo(1 / 3)
   })
 })

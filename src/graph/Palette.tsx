@@ -11,7 +11,9 @@ const OP_KINDS: NodeKind[] = [
   'step',
   'relu',
   'sigmoid',
+  'softmax',
   'rule',
+  'loss',
 ]
 
 function opLabel(kind: NodeKind): string {
@@ -24,8 +26,12 @@ function opLabel(kind: NodeKind): string {
       return 'ReLU'
     case 'sigmoid':
       return 'Sigmoid'
+    case 'softmax':
+      return 'Softmax'
     case 'rule':
       return 'Rule'
+    case 'loss':
+      return 'Loss'
     default:
       return kind
   }

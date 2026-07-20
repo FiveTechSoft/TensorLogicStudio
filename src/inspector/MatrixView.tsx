@@ -1,3 +1,5 @@
+import { heatRgb } from '@/graph/heatmap'
+
 export interface MatrixViewProps {
   title: string
   labels: string[]
@@ -7,15 +9,11 @@ export interface MatrixViewProps {
   onEdit?: () => void
 }
 
-/** Map a cell value to a Tailwind background class (0 → slate, >0 → blue/violet scale). */
-function cellColor(value: number, max: number): string {
-  if (value === 0 || max <= 0) return 'bg-slate-800'
-  const t = Math.min(1, Math.max(0, value / max))
-  if (t < 0.25) return 'bg-blue-900'
-  if (t < 0.5) return 'bg-blue-700'
-  if (t < 0.75) return 'bg-blue-600'
-  if (t < 1) return 'bg-violet-600'
-  return 'bg-violet-500'
+/** Mockup-style heat cell color (cyan → amber → orange). */
+function cellStyle(value: number, max: number): { background: string } {
+  if (max <= 0) return { background: '#1e293b' }
+  const t = Math.min(1, Math.max(0, Math.abs(value) / max))
+  return { background: heatRgb(t) }
 }
 
 export function MatrixView({ title, labels, matrix, highlight, onEdit }: MatrixViewProps) {
@@ -86,9 +84,9 @@ export function MatrixView({ title, labels, matrix, highlight, onEdit }: MatrixV
                 <div
                   key={key}
                   title={`${rowLab},${labels[c]}: ${value}`}
+                  style={cellStyle(value, max)}
                   className={[
-                    'aspect-square min-h-[1.1rem] text-[8px] flex items-center justify-center text-slate-200/80',
-                    cellColor(value, max),
+                    'aspect-square min-h-[1.1rem] text-[8px] flex items-center justify-center text-slate-100/90',
                     isHi ? 'ring-1 ring-inset ring-amber-400' : '',
                   ]
                     .filter(Boolean)
@@ -97,7 +95,7 @@ export function MatrixView({ title, labels, matrix, highlight, onEdit }: MatrixV
                   {value !== 0 && n <= 12
                     ? Number.isInteger(value)
                       ? value
-                      : value.toFixed(1)
+                      : value.toFixed(2)
                     : ''}
                 </div>
               )

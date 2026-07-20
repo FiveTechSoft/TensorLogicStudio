@@ -49,3 +49,49 @@ export function mapDense(t: DenseTensor, fn: (x: number) => number): DenseTensor
   for (let i = 0; i < o.data.length; i++) o.data[i] = fn(o.data[i]!)
   return o
 }
+
+/**
+ * Softmax over the last axis:
+ * - 1D vector → standard softmax
+ * - 2D matrix → row-wise softmax (attention-friendly)
+ */
+export function softmaxDense(t: DenseTensor): DenseTensor {
+  if (t.shape.length === 1) {
+    const n = t.shape[0]!
+    let max = -Infinity
+    for (let i = 0; i < n; i++) max = Math.max(max, t.get([i]))
+    const o = t.clone()
+    let sum = 0
+    for (let i = 0; i < n; i++) {
+      const e = Math.exp(t.get([i]) - max)
+      o.set([i], e)
+      sum += e
+    }
+    if (sum > 0) {
+      for (let i = 0; i < n; i++) o.set([i], o.get([i]) / sum)
+    }
+    return o
+  }
+  if (t.shape.length === 2) {
+    const [rows, cols] = t.shape
+    const o = t.clone()
+    for (let r = 0; r < rows!; r++) {
+      let max = -Infinity
+      for (let c = 0; c < cols!; c++) max = Math.max(max, t.get([r, c]))
+      let sum = 0
+      for (let c = 0; c < cols!; c++) {
+        const e = Math.exp(t.get([r, c]) - max)
+        o.set([r, c], e)
+        sum += e
+      }
+      if (sum > 0) {
+        for (let c = 0; c < cols!; c++) o.set([r, c], o.get([r, c]) / sum)
+      }
+    }
+    return o
+  }
+  // Fallback: flatten then 1D softmax
+  const flat = new DenseTensor([t.data.length])
+  flat.data.set(t.data)
+  return softmaxDense(flat)
+}

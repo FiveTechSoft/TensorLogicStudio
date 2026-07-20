@@ -1,14 +1,9 @@
 import type { Equation, Expr, TensorRef } from '@/types/ast'
-import { mapDense, matmul, relu, sigmoid } from '../ops/dense'
+import { mapDense, matmul, relu, sigmoid, softmaxDense } from '../ops/dense'
 import { DenseTensor } from '../tensor/Tensor'
 
 function step(x: number): number {
   return x > 0 ? 1 : 0
-}
-
-/** Elementwise stub — real softmax needs a vector axis; enough for MVP parsing. */
-function softmaxStub(x: number): number {
-  return Math.exp(x)
 }
 
 function activationFn(fn: 'step' | 'relu' | 'sigmoid' | 'softmax'): (x: number) => number {
@@ -20,7 +15,8 @@ function activationFn(fn: 'step' | 'relu' | 'sigmoid' | 'softmax'): (x: number) 
     case 'step':
       return step
     case 'softmax':
-      return softmaxStub
+      // Elementwise fallback only; real softmax uses softmaxDense on tensors.
+      return (x) => Math.exp(x)
   }
 }
 
@@ -123,7 +119,13 @@ function tryMatmulPattern(
     if (!W) throw new Error(`missing dense tensor ${Wref.name}`)
     if (!X) throw new Error(`missing dense tensor ${Xref.name}`)
     let Y = matmul(W, X)
-    if (activation) Y = mapDense(Y, activation)
+    if (activation) {
+      // Fused softmax(W*X) uses proper tensor softmax, not elementwise exp.
+      Y =
+        expr.kind === 'call' && expr.fn === 'softmax'
+          ? softmaxDense(Y)
+          : mapDense(Y, activation)
+    }
     return Y
   }
 
@@ -145,7 +147,12 @@ function tryMatmulPattern(
   if (!B) throw new Error(`missing dense tensor ${rightRef.name}`)
 
   let Y = matmul(A, B)
-  if (activation) Y = mapDense(Y, activation)
+  if (activation) {
+    Y =
+      expr.kind === 'call' && expr.fn === 'softmax'
+        ? softmaxDense(Y)
+        : mapDense(Y, activation)
+  }
   return Y
 }
 
@@ -161,6 +168,7 @@ function evalExpr(expr: Expr, dense: Map<string, DenseTensor>): DenseTensor {
 
   if (expr.kind === 'call') {
     const arg = evalExpr(expr.arg, dense)
+    if (expr.fn === 'softmax') return softmaxDense(arg)
     return mapDense(arg, activationFn(expr.fn))
   }
 

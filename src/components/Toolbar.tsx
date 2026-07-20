@@ -3,6 +3,7 @@ import { useProjectStore } from '@/store/projectStore'
 import { genealogyProject } from '@/examples/genealogy'
 import { matrixMultiplyProject } from '@/examples/matrixMultiply'
 import { mlpProject } from '@/examples/mlp'
+import { transformerProject } from '@/examples/transformer'
 import {
   ideRuntime,
   loadProjectIntoIde,
@@ -218,6 +219,15 @@ export function Toolbar() {
                 title="Two-layer neural network: X → W1 → ReLU → H → W2 → σ → Y"
               >
                 Neural Network (MLP)
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className={menuItemClass}
+                onClick={() => loadExample(transformerProject)}
+                title="Attention block: Scores = Q·Kᵀ → Softmax → Attn·V (mockup style)"
+              >
+                Transformer Attention
               </button>
               <button
                 type="button"

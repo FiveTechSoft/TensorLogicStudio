@@ -4,6 +4,7 @@ import { symbolForOp } from './edgeOps'
 
 /**
  * Draws data edges in flow coordinates (inside the viewport transform).
+ * Cyan glow style inspired by the Studio architecture mockup.
  * Click the symbol on the arrow to change the operation (+, ×, …).
  */
 export function DataArrowsOverlay({
@@ -34,6 +35,17 @@ export function DataArrowsOverlay({
         }}
       >
         <defs>
+          <filter id="tls-glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3.5" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          <linearGradient id="tls-edge-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.85" />
+            <stop offset="100%" stopColor="#38bdf8" stopOpacity="1" />
+          </linearGradient>
           <marker
             id="tls-arrowhead"
             viewBox="0 0 10 10"
@@ -69,11 +81,20 @@ export function DataArrowsOverlay({
 
           return (
             <g key={e.id}>
+              {/* Soft glow underlay */}
               <path
                 d={d}
                 fill="none"
-                stroke="#38bdf8"
-                strokeWidth={3}
+                stroke="#22d3ee"
+                strokeWidth={8}
+                opacity={0.22}
+                filter="url(#tls-glow)"
+              />
+              <path
+                d={d}
+                fill="none"
+                stroke="url(#tls-edge-grad)"
+                strokeWidth={2.75}
                 markerEnd="url(#tls-arrowhead)"
               />
               {/* Clickable op badge */}
@@ -89,15 +110,16 @@ export function DataArrowsOverlay({
                   cy={my}
                   r={14}
                   fill="#0c1424"
-                  stroke="#38bdf8"
+                  stroke="#22d3ee"
                   strokeWidth={1.5}
+                  filter="url(#tls-glow)"
                 />
                 <text
                   x={mx}
                   y={my}
                   textAnchor="middle"
                   dominantBaseline="central"
-                  fill="#7dd3fc"
+                  fill="#a5f3fc"
                   fontSize={12}
                   fontWeight={700}
                 >
