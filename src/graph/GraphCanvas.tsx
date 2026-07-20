@@ -31,40 +31,9 @@ import { TLNode, kindColor, type TLNodeData } from './nodes/TLNode'
 import { Palette } from './Palette'
 import { setReactFlowInstance } from './rfApi'
 
-/** Logical event-out port for a node kind (Visual Café). */
-function defaultEventOutPort(kind?: NodeKind): string {
-  if (kind === 'query') return 'onMatch'
-  return 'onClick'
-}
-
-/** Logical event-in port for a node kind (Visual Café). */
-function defaultEventInPort(kind?: NodeKind): string {
-  if (kind === 'console') return 'log'
-  if (kind === 'matrixView' || kind === 'highlight') return 'highlight'
-  return 'run'
-}
-
-function isGenericEventHandle(handle?: string | null): boolean {
-  return (
-    handle == null
-    || handle === ''
-    || handle === 'event-out'
-    || handle === 'event-in'
-    || handle === 'out'
-    || handle === 'in'
-  )
-}
-
 const nodeTypes: NodeTypes = {
   tl: TLNode,
 }
-
-const UI_EVENT_KINDS: ReadonlySet<NodeKind> = new Set([
-  'button',
-  'run',
-  'matrixView',
-  'console',
-])
 
 function toRFNode(n: GraphNode): Node<TLNodeData> {
   // Flatten payload so TLNode can read role/caption/shape from data.*
@@ -210,11 +179,10 @@ export function GraphCanvas() {
     (connection: Connection | Edge) => {
       if (!connection.source || !connection.target) return false
       if (connection.source === connection.target) return false
-      // Prefer data-out → data-in and event-out → event-in
+      // Event ports hidden for now — only data connections
       const sh = connection.sourceHandle ?? ''
       const th = connection.targetHandle ?? ''
-      if (sh.includes('event') && th.includes('data')) return false
-      if (sh.includes('data') && th.includes('event')) return false
+      if (sh.includes('event') || th.includes('event')) return false
       return true
     },
     [],
@@ -232,38 +200,17 @@ export function GraphCanvas() {
 
       const sourceNode = nodesNow.find((n) => n.id === connection.source)
       const targetNode = nodesNow.find((n) => n.id === connection.target)
-      const handleIsEvent =
-        connection.sourceHandle?.includes('event') ||
-        connection.targetHandle?.includes('event')
-      const uiIsEvent =
-        (sourceNode != null && UI_EVENT_KINDS.has(sourceNode.kind)) ||
-        (targetNode != null && UI_EVENT_KINDS.has(targetNode.kind))
 
-      const kind: EdgeKind = handleIsEvent || uiIsEvent ? 'event' : 'data'
+      // Data-only mode (no Visual Café event ports on canvas for now)
+      const kind: EdgeKind = 'data'
+      const sourceHandle = 'data-out'
+      const targetHandle = 'data-in'
 
-      let sourceHandle = connection.sourceHandle ?? 'data-out'
-      let targetHandle = connection.targetHandle ?? 'data-in'
-      if (kind === 'event') {
-        if (isGenericEventHandle(sourceHandle) || sourceHandle === 'data-out') {
-          sourceHandle = defaultEventOutPort(sourceNode?.kind)
-        }
-        if (isGenericEventHandle(targetHandle) || targetHandle === 'data-in') {
-          targetHandle = defaultEventInPort(targetNode?.kind)
-        }
-      } else {
-        // Normalize to data ports for tensor wiring
-        if (!sourceHandle || sourceHandle.includes('event')) sourceHandle = 'data-out'
-        if (!targetHandle || targetHandle.includes('event')) targetHandle = 'data-in'
-      }
-
-      // Avoid duplicate edges
       const dup = edgesNow.some(
         (e) =>
           e.source === connection.source &&
           e.target === connection.target &&
-          e.kind === kind &&
-          (e.sourceHandle ?? '') === sourceHandle &&
-          (e.targetHandle ?? '') === targetHandle,
+          e.kind === kind,
       )
       if (dup) return
 
@@ -274,22 +221,18 @@ export function GraphCanvas() {
         target: connection.target!,
         sourceHandle,
         targetHandle,
-        label: kind === 'data' ? '→' : undefined,
+        label: '→',
       }
       setGraph(nodesNow, [...edgesNow, edge])
       useProjectStore.getState().setStatus(
-        kind === 'data'
-          ? `Data arrow: ${sourceNode?.label ?? '?'} → ${targetNode?.label ?? '?'}`
-          : `Event arrow: ${sourceNode?.label ?? '?'} → ${targetNode?.label ?? '?'}`,
+        `Flecha de datos: ${sourceNode?.label ?? '?'} → ${targetNode?.label ?? '?'}`,
       )
 
-      if (kind === 'data') {
-        queueMicrotask(() => {
-          const srcL = sourceNode?.label ?? connection.source
-          const tgtL = targetNode?.label ?? connection.target
-          pushGraphToSource(`Wired ${srcL} → ${tgtL} → code updated`)
-        })
-      }
+      queueMicrotask(() => {
+        const srcL = sourceNode?.label ?? connection.source
+        const tgtL = targetNode?.label ?? connection.target
+        pushGraphToSource(`Wired ${srcL} → ${tgtL} → code updated`)
+      })
     },
     [setGraph],
   )

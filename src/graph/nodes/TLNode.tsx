@@ -44,7 +44,7 @@ const handleBase: CSSProperties = {
   zIndex: 10,
 }
 
-/** Blue = TensorLogic dataflow · Pink = UI events (Visual Café) */
+/** Blue = TensorLogic dataflow only (event ports hidden for now). */
 function DataHandle(props: {
   type: 'source' | 'target'
   position: Position
@@ -58,41 +58,14 @@ function DataHandle(props: {
       id={props.id}
       title={
         props.type === 'source'
-          ? 'DATA out (blue) — drag to another tensor / op'
-          : 'DATA in (blue) — drop connection here'
+          ? 'Salida de datos — arrastra a otro tensor u operación'
+          : 'Entrada de datos — suelta la flecha aquí'
       }
       className="!border-2 !border-slate-950 hover:!scale-125 transition-transform"
       style={{
         ...handleBase,
         background: '#38bdf8',
         boxShadow: '0 0 0 2px rgba(56,189,248,0.35)',
-        ...props.style,
-      }}
-    />
-  )
-}
-
-function EventHandle(props: {
-  type: 'source' | 'target'
-  position: Position
-  id: string
-  style?: CSSProperties
-}) {
-  return (
-    <Handle
-      type={props.type}
-      position={props.position}
-      id={props.id}
-      title={
-        props.type === 'source'
-          ? 'EVENT out (pink) — Visual Café wiring (Run, highlight…)'
-          : 'EVENT in (pink) — receive UI event'
-      }
-      className="!border-2 !border-slate-950 hover:!scale-125 transition-transform"
-      style={{
-        ...handleBase,
-        background: '#f472b6',
-        boxShadow: '0 0 0 2px rgba(244,114,182,0.35)',
         ...props.style,
       }}
     />
@@ -150,18 +123,11 @@ export function TLNode({ data }: NodeProps<TLRFNode>) {
           : undefined,
       }}
     >
-      {/* Left: inputs */}
       <DataHandle
         type="target"
         position={Position.Left}
         id="data-in"
-        style={{ top: '38%' }}
-      />
-      <EventHandle
-        type="target"
-        position={Position.Left}
-        id="event-in"
-        style={{ top: '68%' }}
+        style={{ top: '50%' }}
       />
 
       <div
@@ -190,18 +156,11 @@ export function TLNode({ data }: NodeProps<TLRFNode>) {
         </div>
       )}
 
-      {/* Right: outputs — start drag from blue to wire tensors */}
       <DataHandle
         type="source"
         position={Position.Right}
         id="data-out"
-        style={{ top: '38%' }}
-      />
-      <EventHandle
-        type="source"
-        position={Position.Right}
-        id="event-out"
-        style={{ top: '68%' }}
+        style={{ top: '50%' }}
       />
     </div>
   )
