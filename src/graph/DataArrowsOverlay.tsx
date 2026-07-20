@@ -1,0 +1,93 @@
+import { ViewportPortal, useStore } from '@xyflow/react'
+import { useProjectStore } from '@/store/projectStore'
+
+/**
+ * Draws data edges in flow coordinates (inside the viewport transform).
+ * Reliable fallback when the built-in edge renderer does not paint.
+ */
+export function DataArrowsOverlay() {
+  const edges = useProjectStore((s) => s.project.graph.edges)
+  const nodeLookup = useStore((s) => s.nodeLookup)
+  // Re-render when nodes move / resize
+  const nodeOrigin = useStore((s) => s.nodeOrigin)
+
+  const dataEdges = edges.filter((e) => e.kind === 'data')
+  void nodeOrigin
+
+  return (
+    <ViewportPortal>
+      <svg
+        className="tls-data-arrows"
+        width="4000"
+        height="4000"
+        style={{
+          position: 'absolute',
+          left: -1000,
+          top: -1000,
+          overflow: 'visible',
+          pointerEvents: 'none',
+          zIndex: 4,
+        }}
+      >
+        <defs>
+          <marker
+            id="tls-arrowhead"
+            viewBox="0 0 10 10"
+            refX="9"
+            refY="5"
+            markerWidth="9"
+            markerHeight="9"
+            orient="auto-start-reverse"
+          >
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#38bdf8" />
+          </marker>
+        </defs>
+        {dataEdges.map((e) => {
+          const s = nodeLookup.get(e.source)
+          const t = nodeLookup.get(e.target)
+          if (!s || !t) return null
+
+          const sw = s.measured?.width ?? s.width ?? 180
+          const sh = s.measured?.height ?? s.height ?? 110
+          const th = t.measured?.height ?? t.height ?? 110
+
+          // Offset for ViewportPortal SVG origin (-1000,-1000)
+          const ox = 1000
+          const oy = 1000
+          const x1 = s.position.x + sw + ox
+          const y1 = s.position.y + sh / 2 + oy
+          const x2 = t.position.x + ox
+          const y2 = t.position.y + th / 2 + oy
+          const dx = Math.max(48, Math.abs(x2 - x1) * 0.45)
+          const d = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`
+          const mx = (x1 + x2) / 2
+          const my = (y1 + y2) / 2 - 4
+
+          return (
+            <g key={e.id}>
+              <path
+                d={d}
+                fill="none"
+                stroke="#38bdf8"
+                strokeWidth={3}
+                markerEnd="url(#tls-arrowhead)"
+              />
+              <circle cx={mx} cy={my} r={12} fill="#0c1424" stroke="#38bdf8" strokeWidth={1.5} />
+              <text
+                x={mx}
+                y={my}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fill="#7dd3fc"
+                fontSize={13}
+                fontWeight={700}
+              >
+                {e.label && e.label !== '→' ? e.label : '→'}
+              </text>
+            </g>
+          )
+        })}
+      </svg>
+    </ViewportPortal>
+  )
+}

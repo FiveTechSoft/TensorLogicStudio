@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, type MouseEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, type MouseEvent } from 'react'
 import {
   ReactFlow,
   Background,
@@ -26,9 +26,9 @@ import { useProjectStore } from '@/store/projectStore'
 import type { GraphNode, GraphEdge, EdgeKind, NodeKind } from '@/types/project'
 import { ideBus } from '@/runtime/ideRuntime'
 import { pushGraphToSource } from '@/editor/pushGraphToSource'
-import { edgeTypes } from './edgeTypes'
 import { TLNode, kindColor, type TLNodeData } from './nodes/TLNode'
 import { Palette } from './Palette'
+import { DataArrowsOverlay } from './DataArrowsOverlay'
 import { setReactFlowInstance } from './rfApi'
 
 const nodeTypes: NodeTypes = {
@@ -37,6 +37,7 @@ const nodeTypes: NodeTypes = {
 
 function toRFNode(n: GraphNode, selectedId?: string): Node<TLNodeData> {
   // Flatten payload so TLNode can read role/caption/shape from data.*
+  // Explicit width/height help React Flow compute edge paths immediately.
   return {
     id: n.id,
     type: 'tl',
@@ -44,6 +45,8 @@ function toRFNode(n: GraphNode, selectedId?: string): Node<TLNodeData> {
     selected: selectedId != null && n.id === selectedId,
     connectable: true,
     draggable: true,
+    width: 180,
+    height: 110,
     data: {
       label: n.label,
       kind: n.kind,
@@ -71,23 +74,22 @@ function fromRFNode(n: Node): GraphNode {
 
 function toRFEdge(e: GraphEdge): Edge {
   const isEvent = e.kind === 'event'
+  // Minimal edge — RF default renderer. Do not bind handle ids unless needed;
+  // mismatched handle ids prevent edges from rendering at all.
   return {
     id: e.id,
     source: e.source,
     target: e.target,
-    type: e.kind,
-    sourceHandle: e.sourceHandle,
-    targetHandle: e.targetHandle,
-    label: e.label,
+    label: e.label ?? (isEvent ? undefined : '→'),
     markerEnd: {
       type: MarkerType.ArrowClosed,
-      width: 18,
-      height: 18,
+      width: 20,
+      height: 20,
       color: isEvent ? '#f472b6' : '#38bdf8',
     },
     style: {
       stroke: isEvent ? '#f472b6' : '#38bdf8',
-      strokeWidth: 2.5,
+      strokeWidth: 3,
     },
   }
 }
@@ -143,17 +145,66 @@ function FitViewOnLoad() {
   return null
 }
 
+/** Shared helper: create a data edge between two nodes and sync code. */
+export function connectDataNodes(sourceId: string, targetId: string): boolean {
+  if (!sourceId || !targetId || sourceId === targetId) return false
+  const state = useProjectStore.getState()
+  const nodesNow = state.project.graph.nodes
+  const edgesNow = state.project.graph.edges
+  const sourceNode = nodesNow.find((n) => n.id === sourceId)
+  const targetNode = nodesNow.find((n) => n.id === targetId)
+  if (!sourceNode || !targetNode) return false
+
+  const dup = edgesNow.some(
+    (e) => e.source === sourceId && e.target === targetId && e.kind === 'data',
+  )
+  if (dup) {
+    state.setStatus('Ya existe esa flecha')
+    return false
+  }
+
+  const edge: GraphEdge = {
+    id: `e-${crypto.randomUUID()}`,
+    kind: 'data',
+    source: sourceId,
+    target: targetId,
+    label: '→',
+  }
+  state.setGraph(nodesNow, [...edgesNow, edge])
+  useProjectStore.setState({
+    graphLockUntil: Date.now() + 2500,
+    skipNextSourceToGraph: true,
+  })
+  state.setStatus(`Flecha: ${sourceNode.label} → ${targetNode.label}`)
+  state.appendConsole(`Arrow ${sourceNode.label} → ${targetNode.label}`)
+  queueMicrotask(() => {
+    pushGraphToSource(`Wired ${sourceNode.label} → ${targetNode.label}`)
+  })
+  return true
+}
+
 export function GraphCanvas() {
   const graph = useProjectStore((s) => s.project.graph)
   const selectedId = useProjectStore((s) => s.project.ui.selectedId)
   const setGraph = useProjectStore((s) => s.setGraph)
   const setSelected = useProjectStore((s) => s.setSelected)
+  // Two-click link mode: first click on source handle, second on target
+  const linkFromRef = useRef<string | null>(null)
 
   const nodes = useMemo(
     () => graph.nodes.map((n) => toRFNode(n, selectedId)),
     [graph.nodes, selectedId],
   )
-  const edges = useMemo(() => graph.edges.map(toRFEdge), [graph.edges])
+  const edges = useMemo(() => {
+    const mapped = graph.edges.map(toRFEdge)
+    return mapped
+  }, [graph.edges])
+
+  // Debug: keep edge count in DOM for tests / diagnosis
+  useEffect(() => {
+    const el = document.getElementById('tls-edge-debug')
+    if (el) el.textContent = `edges:${graph.edges.length}`
+  }, [graph.edges])
 
   const onNodesChange: OnNodesChange = useCallback(
     (changes) => {
@@ -168,10 +219,15 @@ export function GraphCanvas() {
           .filter((c): c is { type: 'remove'; id: string } => c.type === 'remove')
           .map((c) => c.id),
       )
+
+      // Ignore pure position/select/dimensions noise that could race with connect —
+      // still apply them, but ALWAYS re-read edges from store AFTER apply so a
+      // concurrent connectDataNodes edge is never dropped.
       const next = applyNodeChanges(changes, current)
       const selected = next.find((n) => n.selected)
 
-      let nextEdges = state.project.graph.edges
+      // Fresh edges after any concurrent setGraph from connect
+      let nextEdges = useProjectStore.getState().project.graph.edges
       if (removedIds.size > 0) {
         nextEdges = nextEdges.filter(
           (e) => !removedIds.has(e.source) && !removedIds.has(e.target),
@@ -188,11 +244,11 @@ export function GraphCanvas() {
       } else if (selected) {
         setSelected(selected.id)
       } else if (changes.some((c) => c.type === 'select')) {
-        // Deselected all
         const still = next.find((n) => n.selected)
         if (!still) setSelected(undefined)
       }
 
+      // Merge RF node positions with store, keep store edges intact
       setGraph(next.map(fromRFNode), nextEdges)
 
       if (removedIds.size > 0) {
@@ -266,65 +322,34 @@ export function GraphCanvas() {
     return Boolean(c.source && c.target && c.source !== c.target)
   }, [])
 
-  const onConnect: OnConnect = useCallback(
-    (connection) => {
-      if (!connection.source || !connection.target) return
-      if (connection.source === connection.target) return
+  const onConnect: OnConnect = useCallback((connection) => {
+    if (!connection.source || !connection.target) return
+    connectDataNodes(connection.source, connection.target)
+    linkFromRef.current = null
+  }, [])
 
-      const state = useProjectStore.getState()
-      const nodesNow = state.project.graph.nodes
-      const edgesNow = state.project.graph.edges
-
-      const sourceNode = nodesNow.find((n) => n.id === connection.source)
-      const targetNode = nodesNow.find((n) => n.id === connection.target)
-
-      const sourceHandle = connection.sourceHandle || 'data-out'
-      const targetHandle = connection.targetHandle || 'data-in'
-
-      const dup = edgesNow.some(
-        (e) =>
-          e.source === connection.source &&
-          e.target === connection.target &&
-          e.kind === 'data',
-      )
-      if (dup) {
-        useProjectStore.getState().setStatus('Ya existe esa flecha')
-        return
+  // Expose for Playwright / console debugging
+  useEffect(() => {
+    const w = window as unknown as {
+      __tlsConnect?: (a: string, b: string) => boolean
+      __tlsEdgeCount?: () => number
+      __tlsDumpGraph?: () => { nodes: string[]; edges: string[] }
+    }
+    w.__tlsConnect = connectDataNodes
+    w.__tlsEdgeCount = () => useProjectStore.getState().project.graph.edges.length
+    w.__tlsDumpGraph = () => {
+      const g = useProjectStore.getState().project.graph
+      return {
+        nodes: g.nodes.map((n) => n.id),
+        edges: g.edges.map((e) => `${e.source}->${e.target}(${e.kind})`),
       }
-
-      const edge: GraphEdge = {
-        id: `e-${crypto.randomUUID()}`,
-        kind: 'data',
-        source: connection.source,
-        target: connection.target,
-        sourceHandle,
-        targetHandle,
-        label: '→',
-      }
-      setGraph(nodesNow, [...edgesNow, edge])
-      useProjectStore.setState({
-        graphLockUntil: Date.now() + 2000,
-        skipNextSourceToGraph: true,
-      })
-      useProjectStore
-        .getState()
-        .setStatus(
-          `Flecha: ${sourceNode?.label ?? '?'} → ${targetNode?.label ?? '?'}`,
-        )
-      useProjectStore
-        .getState()
-        .appendConsole(
-          `Arrow ${sourceNode?.label ?? connection.source} → ${targetNode?.label ?? connection.target}`,
-        )
-
-      queueMicrotask(() => {
-        pushGraphToSource(
-          `Wired ${sourceNode?.label ?? connection.source} → ${targetNode?.label ?? connection.target}`,
-        )
-      })
-    },
-    [setGraph],
-  )
+    }
+    return () => {
+      delete w.__tlsConnect
+      delete w.__tlsEdgeCount
+      delete w.__tlsDumpGraph
+    }
+  }, [])
 
   const onNodeClick = useCallback(
     (_: MouseEvent, node: Node) => {
@@ -337,14 +362,30 @@ export function GraphCanvas() {
     [setSelected],
   )
 
+  /**
+   * Two-click wiring fallback (more reliable than drag in some browsers):
+   * click source handle → click target handle.
+   */
+  const onPaneClick = useCallback(() => {
+    if (linkFromRef.current) {
+      linkFromRef.current = null
+      useProjectStore.getState().setStatus('Conexión cancelada')
+    }
+  }, [])
+
   return (
     <div className="relative flex-1 min-h-0 w-full h-full" style={{ minHeight: 320 }}>
       <Palette />
+      <div
+        id="tls-edge-debug"
+        className="absolute bottom-2 left-14 z-20 text-[10px] text-slate-500 font-mono pointer-events-none"
+      >
+        edges:{graph.edges.length}
+      </div>
       <ReactFlow
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
@@ -360,21 +401,22 @@ export function GraphCanvas() {
         connectionRadius={40}
         connectionLineStyle={{ stroke: '#38bdf8', strokeWidth: 3 }}
         defaultEdgeOptions={{
-          type: 'data',
+          type: 'default',
           animated: false,
+          style: { stroke: '#38bdf8', strokeWidth: 3 },
           markerEnd: {
             type: MarkerType.ArrowClosed,
             color: '#38bdf8',
-            width: 18,
-            height: 18,
+            width: 20,
+            height: 20,
           },
         }}
         minZoom={0.3}
         maxZoom={2}
-        // Left-drag on empty pane pans; handles still start connections
-        // Middle/right pan is also enabled; space+drag works via RF defaults
-        panOnDrag
+        // Free left mouse for handle-drag connections; pan with middle mouse or trackpad
+        panOnDrag={[1, 2]}
         panOnScroll
+        zoomOnScroll
         selectionOnDrag={false}
         selectNodesOnDrag={false}
         nodesDraggable
@@ -387,16 +429,37 @@ export function GraphCanvas() {
         onlyRenderVisibleElements={false}
         elevateNodesOnSelect
         style={{ width: '100%', height: '100%' }}
-        onConnectStart={(_, { handleType }) => {
-          if (handleType === 'source') {
+        onPaneClick={onPaneClick}
+        onConnectStart={(_, params) => {
+          if (params.handleType === 'source' && params.nodeId) {
+            linkFromRef.current = params.nodeId
             useProjectStore
               .getState()
-              .setStatus('Arrastra hasta el punto azul de otra caja…')
+              .setStatus('Suelta en el punto azul de la otra caja (o haz clic en ella)')
           }
+        }}
+        onConnectEnd={(event) => {
+          // Two-click / click-target fallback if drag did not hit a handle
+          if (!linkFromRef.current) return
+          const from = linkFromRef.current
+          const t = event.target as HTMLElement | null
+          const handle = t?.closest?.('.react-flow__handle') as HTMLElement | null
+          const nodeEl = t?.closest?.('.react-flow__node') as HTMLElement | null
+          let targetId: string | null = null
+          if (handle?.dataset.nodeid && handle.classList.contains('target')) {
+            targetId = handle.dataset.nodeid
+          } else if (nodeEl?.dataset.id) {
+            targetId = nodeEl.dataset.id
+          }
+          if (targetId && targetId !== from) {
+            connectDataNodes(from, targetId)
+          }
+          linkFromRef.current = null
         }}
       >
         <FitViewOnLoad />
         <Background variant={BackgroundVariant.Dots} gap={18} size={1} color="#1e293b" />
+        <DataArrowsOverlay />
         <Controls className="!bg-slate-900 !border-slate-700 !shadow-none" />
         <MiniMap
           nodeColor={(n) => kindColor(String((n.data as TLNodeData | undefined)?.kind ?? ''))}

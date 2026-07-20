@@ -120,5 +120,6 @@ function EventEdge({
 
 export const edgeTypes: EdgeTypes = {
   data: DataEdge,
+  default: DataEdge,
   event: EventEdge,
 }

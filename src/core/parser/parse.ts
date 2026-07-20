@@ -147,7 +147,7 @@ class Parser {
     this.expect('QUERY')
     const goal = this.parseAtom()
     this.expect('DOT', "expected '.' after query")
-    const id = `query:${this.queryCount++}`
+    const id = `query-${this.queryCount++}`
     return {
       kind: 'query',
       id,
@@ -186,7 +186,7 @@ class Parser {
     this.factCounts.set(atom.relation, n + 1)
     return {
       kind: 'fact',
-      id: `fact:${atom.relation}:${n}`,
+      id: `fact-${atom.relation}-${n}`,
       relation: atom.relation,
       args: atom.args,
     }
@@ -197,7 +197,7 @@ class Parser {
     this.ruleCounts.set(head.relation, n + 1)
     return {
       kind: 'rule',
-      id: `rule:${head.relation}:${n}`,
+      id: `rule-${head.relation}-${n}`,
       head,
       body,
       span: { start, end: this.prev().pos + 1 },
@@ -209,7 +209,7 @@ class Parser {
     this.equationCounts.set(lhs.name, n + 1)
     return {
       kind: 'equation',
-      id: `equation:${lhs.name}:${n}`,
+      id: `equation-${lhs.name}-${n}`,
       lhs,
       rhs,
       span: { start, end: this.prev().pos + 1 },

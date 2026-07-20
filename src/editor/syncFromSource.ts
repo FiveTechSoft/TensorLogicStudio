@@ -12,12 +12,13 @@ const UI_KINDS: ReadonlySet<NodeKind> = new Set([
   'stepIter',
 ])
 
+/** Safe DOM/React Flow ids — colons break CSS selectors used for edge handles. */
 function relationNodeId(name: string): string {
-  return `relation:${name}`
+  return `relation-${name}`
 }
 
 function tensorNodeId(name: string): string {
-  return `tensor:${name}`
+  return `tensor-${name}`
 }
 
 function collectRefs(expr: Expr, out: Set<string>): void {

@@ -24,7 +24,7 @@ export const matrixMultiplyProject: Project = {
   graph: {
     nodes: [
       {
-        id: 'tensor:A',
+        id: 'tensor-A',
         kind: 'tensor',
         label: 'A',
         position: { x: 60, y: 160 },
@@ -35,7 +35,7 @@ export const matrixMultiplyProject: Project = {
         },
       },
       {
-        id: 'tensor:B',
+        id: 'tensor-B',
         kind: 'tensor',
         label: 'B',
         position: { x: 420, y: 160 },
@@ -56,7 +56,7 @@ export const matrixMultiplyProject: Project = {
         },
       },
       {
-        id: 'tensor:C',
+        id: 'tensor-C',
         kind: 'tensor',
         label: 'C',
         position: { x: 240, y: 440 },
@@ -78,8 +78,8 @@ export const matrixMultiplyProject: Project = {
       {
         id: 'e-a-b-mul',
         kind: 'data',
-        source: 'tensor:A',
-        target: 'tensor:B',
+        source: 'tensor-A',
+        target: 'tensor-B',
         sourceHandle: 'data-out',
         targetHandle: 'data-in',
         label: '×',
@@ -87,7 +87,7 @@ export const matrixMultiplyProject: Project = {
       {
         id: 'e-a-op',
         kind: 'data',
-        source: 'tensor:A',
+        source: 'tensor-A',
         target: 'op-mul',
         sourceHandle: 'data-out',
         targetHandle: 'data-in',
@@ -96,7 +96,7 @@ export const matrixMultiplyProject: Project = {
       {
         id: 'e-b-op',
         kind: 'data',
-        source: 'tensor:B',
+        source: 'tensor-B',
         target: 'op-mul',
         sourceHandle: 'data-out',
         targetHandle: 'data-in',
@@ -106,7 +106,7 @@ export const matrixMultiplyProject: Project = {
         id: 'e-op-c',
         kind: 'data',
         source: 'op-mul',
-        target: 'tensor:C',
+        target: 'tensor-C',
         sourceHandle: 'data-out',
         targetHandle: 'data-in',
         label: '=',
@@ -124,7 +124,7 @@ export const matrixMultiplyProject: Project = {
   ui: {
     panelSizes: [28, 44, 28],
     camera: { x: 0, y: 0, zoom: 1 },
-    selectedId: 'tensor:A',
+    selectedId: 'tensor-A',
   },
   meta: {
     createdAt: now,

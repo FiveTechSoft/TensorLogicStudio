@@ -2,29 +2,35 @@ import { nextTensorLabel } from '@/editor/graphToSource'
 import { pushGraphToSource } from '@/editor/pushGraphToSource'
 import { useProjectStore } from '@/store/projectStore'
 import type { GraphNode } from '@/types/project'
-import { getReactFlowInstance, revealNodeInView } from './rfApi'
+import { getReactFlowInstance } from './rfApi'
 
 function placeOffset(nodes: GraphNode[]): { x: number; y: number } {
+  const tensors = nodes.filter((n) => n.kind === 'relation' || n.kind === 'tensor')
   const rf = getReactFlowInstance()
-  if (rf) {
-    const pane = document.querySelector('.react-flow') as HTMLElement | null
-    if (pane) {
-      const rect = pane.getBoundingClientRect()
-      const tensors = nodes.filter((n) => n.kind === 'relation' || n.kind === 'tensor')
-      const i = tensors.length
-      const flowPos = rf.screenToFlowPosition({
-        x: rect.left + rect.width * (0.35 + (i % 3) * 0.12),
-        y: rect.top + rect.height * (0.4 + Math.floor(i / 3) * 0.12),
-      })
-      return { x: flowPos.x - 90, y: flowPos.y - 50 }
+  const pane = document.querySelector('.react-flow') as HTMLElement | null
+
+  // First tensor: left side of visible pane
+  if (tensors.length === 0 && rf && pane) {
+    const rect = pane.getBoundingClientRect()
+    const flowPos = rf.screenToFlowPosition({
+      x: rect.left + rect.width * 0.25,
+      y: rect.top + rect.height * 0.45,
+    })
+    return { x: flowPos.x - 90, y: flowPos.y - 50 }
+  }
+
+  // Next tensors: always to the RIGHT of the rightmost tensor (gap for arrows)
+  if (tensors.length > 0) {
+    const rightmost = tensors.reduce((a, b) =>
+      a.position.x >= b.position.x ? a : b,
+    )
+    return {
+      x: rightmost.position.x + 320,
+      y: rightmost.position.y,
     }
   }
-  const tensors = nodes.filter((n) => n.kind === 'relation' || n.kind === 'tensor')
-  const i = tensors.length
-  return {
-    x: 80 + (i % 3) * 220,
-    y: 120 + Math.floor(i / 3) * 160,
-  }
+
+  return { x: 80, y: 140 }
 }
 
 /**
@@ -35,7 +41,8 @@ export function addTensorBox(kind: 'relation' | 'tensor' = 'relation'): string {
   const s = useProjectStore.getState()
   const { nodes, edges } = s.project.graph
   const label = nextTensorLabel(nodes, kind)
-  const baseId = kind === 'relation' ? `relation:${label}` : `tensor:${label}`
+  // No colons in ids — React Flow uses CSS selectors for edge endpoints
+  const baseId = kind === 'relation' ? `relation-${label}` : `tensor-${label}`
   const id = nodes.some((n) => n.id === baseId)
     ? `${baseId}-${crypto.randomUUID().slice(0, 8)}`
     : baseId
@@ -63,30 +70,30 @@ export function addTensorBox(kind: 'relation' | 'tensor' = 'relation'): string {
     focusNodeId: id,
   })
 
-  // Bring the box into the visible center of Tensor Graph (critical UX)
+  // Fit all tensor boxes into view (do NOT re-center every new box on the same spot)
   const reveal = () => {
-    revealNodeInView(id)
-    // Keep store position in sync with RF instance after reveal
-    const later =
-      typeof window !== 'undefined' ? window.setTimeout.bind(window) : setTimeout
-    later(() => {
-      const rf = getReactFlowInstance()
-      const rfNode = rf?.getNode(id)
-      if (!rfNode) return
-      const cur = useProjectStore.getState()
-      cur.setGraph(
-        cur.project.graph.nodes.map((n) =>
-          n.id === id ? { ...n, position: { ...rfNode.position } } : n,
-        ),
-        cur.project.graph.edges,
-      )
-    }, 120)
+    const rf = getReactFlowInstance()
+    if (!rf) return
+    const tensorIds = useProjectStore
+      .getState()
+      .project.graph.nodes.filter((n) => n.kind === 'relation' || n.kind === 'tensor')
+      .map((n) => ({ id: n.id }))
+    if (tensorIds.length === 0) return
+    rf.fitView({
+      nodes: tensorIds,
+      padding: 0.35,
+      duration: 200,
+      maxZoom: 1.15,
+      minZoom: 0.45,
+    })
   }
   if (typeof requestAnimationFrame === 'function') {
     requestAnimationFrame(reveal)
   } else {
-    // Vitest/node has no rAF
     setTimeout(reveal, 0)
+  }
+  if (typeof window !== 'undefined') {
+    window.setTimeout(reveal, 150)
   }
 
   // Sync code after store has the new node
@@ -101,8 +108,7 @@ export function addTensorBox(kind: 'relation' | 'tensor' = 'relation'): string {
       cur.setGraph([...cur.project.graph.nodes, node], cur.project.graph.edges)
     }
     if (typeof window !== 'undefined') {
-      window.setTimeout(() => revealNodeInView(id), 50)
-      window.setTimeout(() => revealNodeInView(id), 250)
+      window.setTimeout(reveal, 80)
     }
   })
 

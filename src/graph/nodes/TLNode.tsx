@@ -48,27 +48,20 @@ function DataHandle(props: {
       type={props.type}
       position={props.position}
       id={props.id}
-      isConnectable
-      isConnectableStart={isSource}
-      isConnectableEnd={!isSource}
+      isConnectable={true}
       title={
         isSource
-          ? 'Salida — mantén pulsado y arrastra hasta el punto azul de otra caja'
-          : 'Entrada — suelta aquí la flecha'
+          ? 'Salida — arrastra o haz clic, luego suelta/clic en la entrada azul de otra caja'
+          : 'Entrada — suelta aquí la flecha (o haz clic si ya elegiste la salida)'
       }
+      // Keep defaults from React Flow for positioning; only size/color override
       style={
         {
-          width: 18,
-          height: 18,
+          width: 20,
+          height: 20,
           background: '#38bdf8',
-          border: '3px solid #0b1220',
-          borderRadius: 999,
-          zIndex: 20,
-          // Pull handle outside the card so it is easy to grab
-          ...(props.position === Position.Left ? { left: -9 } : {}),
-          ...(props.position === Position.Right ? { right: -9 } : {}),
-          ...(props.position === Position.Top ? { top: -9 } : {}),
-          ...(props.position === Position.Bottom ? { bottom: -9 } : {}),
+          border: '3px solid #0f172a',
+          zIndex: 30,
         } as CSSProperties
       }
     />
