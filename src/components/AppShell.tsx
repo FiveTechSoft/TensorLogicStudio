@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Toolbar } from './Toolbar'
 import { StatusBar } from './StatusBar'
 import { ConsolePanel } from './ConsolePanel'
+import { CodeEditor } from '@/editor/CodeEditor'
 
 function PaneHeader({ children }: { children: ReactNode }) {
   return (
@@ -29,8 +30,7 @@ export function AppShell() {
         style={{ gridTemplateColumns: '28% 44% 28%' }}
       >
         <section className="border-r border-slate-800 min-h-0 flex flex-col bg-[#0c1424]/80">
-          <PaneHeader>Declarative Rules</PaneHeader>
-          <PanePlaceholder label="Code editor" />
+          <CodeEditor />
         </section>
 
         <section className="border-r border-slate-800 min-h-0 flex flex-col">
