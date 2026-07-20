@@ -215,9 +215,9 @@ export function Toolbar() {
                 role="menuitem"
                 className={menuItemClass}
                 onClick={() => loadExample(mlpProject)}
-                title="Small dense MLP forward (and optional train step)"
+                title="Two-layer neural network: X → W1 → ReLU → H → W2 → σ → Y"
               >
-                MLP
+                Neural Network (MLP)
               </button>
               <button
                 type="button"
