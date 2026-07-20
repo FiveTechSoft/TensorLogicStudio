@@ -2,8 +2,13 @@ export type TokenKind =
   | 'IDENT'
   | 'LPAREN'
   | 'RPAREN'
+  | 'LBRACK'
+  | 'RBRACK'
   | 'COMMA'
   | 'DOT'
+  | 'EQ'
+  | 'STAR'
+  | 'PLUS'
   | 'COLON_MINUS'
   | 'QUERY'
   | 'EOF'
@@ -75,6 +80,16 @@ export function tokenize(source: string): Token[] {
       i++
       continue
     }
+    if (c === '[') {
+      tokens.push({ kind: 'LBRACK', pos: i })
+      i++
+      continue
+    }
+    if (c === ']') {
+      tokens.push({ kind: 'RBRACK', pos: i })
+      i++
+      continue
+    }
     if (c === ',') {
       tokens.push({ kind: 'COMMA', pos: i })
       i++
@@ -82,6 +97,21 @@ export function tokenize(source: string): Token[] {
     }
     if (c === '.') {
       tokens.push({ kind: 'DOT', pos: i })
+      i++
+      continue
+    }
+    if (c === '=') {
+      tokens.push({ kind: 'EQ', pos: i })
+      i++
+      continue
+    }
+    if (c === '*') {
+      tokens.push({ kind: 'STAR', pos: i })
+      i++
+      continue
+    }
+    if (c === '+') {
+      tokens.push({ kind: 'PLUS', pos: i })
       i++
       continue
     }
