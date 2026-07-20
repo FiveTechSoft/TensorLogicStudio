@@ -107,18 +107,18 @@ function buildEventActions(nodes: GraphNode[]): Record<string, Record<string, ()
   return actions
 }
 
-/** Debounced source → graph dual-sync (300ms). */
+/** Debounced source → graph dual-sync (300ms). Skips when source came from the graph. */
 function useSourceToGraphSync() {
   const source = useProjectStore((s) => s.project.source)
 
   useEffect(() => {
     const handle = window.setTimeout(() => {
-      const {
-        project,
-        setGraph,
-        setParseError,
-        setGraphStale,
-      } = useProjectStore.getState()
+      const state = useProjectStore.getState()
+      if (state.skipNextSourceToGraph) {
+        useProjectStore.setState({ skipNextSourceToGraph: false })
+        return
+      }
+      const { project, setGraph, setParseError, setGraphStale } = state
       const result = graphFromSource(project.source, project.graph)
       setGraph(result.nodes, result.edges)
       if (result.error) {

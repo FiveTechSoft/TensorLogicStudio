@@ -3,6 +3,7 @@ import {
   extractRelationSheet,
   rewriteRelationFacts,
 } from '@/core/source/rewriteRelationFacts'
+import { pushGraphToSource } from '@/editor/pushGraphToSource'
 import { useProjectStore } from '@/store/projectStore'
 import { ideRuntime } from '@/runtime/ideRuntime'
 
@@ -24,7 +25,7 @@ export function TensorSpreadsheet({
   onClose,
 }: TensorSpreadsheetProps) {
   const source = useProjectStore((s) => s.project.source)
-  const setSource = useProjectStore((s) => s.setSource)
+  const setSourceFromGraph = useProjectStore((s) => s.setSourceFromGraph)
   const denseSeeds = useProjectStore((s) => s.project.meta.denseSeeds)
   const setStatus = useProjectStore((s) => s.setStatus)
   const appendConsole = useProjectStore((s) => s.appendConsole)
@@ -83,13 +84,15 @@ export function TensorSpreadsheet({
         nextLabels,
         nextMatrix,
       )
-      setSource(nextSource)
-      setStatus(`Spreadsheet → ${relation} (${countOnes(nextMatrix)} facts)`)
-      appendConsole(
-        `Updated relation ${relation} from spreadsheet (${countOnes(nextMatrix)} facts)`,
-      )
+      // Facts first, then re-emit full program from graph (pragmas + rules + facts)
+      setSourceFromGraph(nextSource)
+      queueMicrotask(() => {
+        pushGraphToSource(
+          `Spreadsheet → ${relation} (${countOnes(nextMatrix)} facts) → code`,
+        )
+      })
     },
-    [source, relName, setSource, setStatus, appendConsole],
+    [source, relName, setSourceFromGraph],
   )
 
   const applyDense = useCallback(

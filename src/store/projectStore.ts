@@ -32,6 +32,10 @@ interface ProjectState {
   queryBindings: Record<string, string>[]
   lastRun: LastRunInfo | null
   setSource: (source: string) => void
+  /** Update source from the graph without rebuilding the canvas (two-way lock). */
+  setSourceFromGraph: (source: string) => void
+  /** When true, next source→graph sync is skipped once. */
+  skipNextSourceToGraph: boolean
   setGraph: (nodes: GraphNode[], edges: GraphEdge[]) => void
   loadProject: (p: Project) => void
   setSelected: (id?: string) => void
@@ -64,10 +68,24 @@ export const useProjectStore = create<ProjectState>((set) => ({
   matrices: [],
   queryBindings: [],
   lastRun: null,
+  skipNextSourceToGraph: false,
   setSource: (source) =>
     set((s) => ({
       project: { ...s.project, source, meta: { ...s.project.meta, updatedAt: new Date().toISOString() } },
       sourceDirty: true,
+      skipNextSourceToGraph: false,
+    })),
+  setSourceFromGraph: (source) =>
+    set((s) => ({
+      project: {
+        ...s.project,
+        source,
+        meta: { ...s.project.meta, updatedAt: new Date().toISOString() },
+      },
+      sourceDirty: true,
+      skipNextSourceToGraph: true,
+      graphStale: false,
+      parseError: null,
     })),
   setGraph: (nodes, edges) =>
     set((s) => ({
@@ -86,6 +104,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       queryBindings: [],
       lastRun: null,
       spreadsheet: null,
+      skipNextSourceToGraph: false,
     }),
   setSelected: (id) =>
     set((s) => ({ project: { ...s.project, ui: { ...s.project.ui, selectedId: id } } })),

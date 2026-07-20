@@ -72,15 +72,49 @@ function ensureTensor(
   })
 }
 
+function applyPrevPositions(
+  nodes: GraphNode[],
+  prev: { nodes: GraphNode[] },
+): GraphNode[] {
+  return nodes.map((n) => {
+    const p = prev.nodes.find((x) => x.id === n.id)
+    return p ? { ...n, position: p.position } : n
+  })
+}
+
 function tensorOrRelationId(name: string, seen: Set<string>): string {
   const relId = relationNodeId(name)
   if (seen.has(relId)) return relId
   return tensorNodeId(name)
 }
 
+function prevPosition(
+  prev: { nodes: GraphNode[] },
+  id: string,
+): { x: number; y: number } {
+  const p = prev.nodes.find((n) => n.id === id)
+  return p?.position ?? { x: 0, y: 0 }
+}
+
+/** Parse visual pragmas: `% @tensor relation Name` / `% @tensor dense Name` */
+function parseTensorPragmas(source: string): { relations: string[]; dense: string[] } {
+  const relations: string[] = []
+  const dense: string[] = []
+  for (const line of source.split(/\r?\n/)) {
+    const m = /^\s*%\s*@tensor\s+(relation|dense)\s+([A-Za-z_][A-Za-z0-9_]*)\s*$/.exec(
+      line,
+    )
+    if (!m) continue
+    if (m[1] === 'relation') relations.push(m[2])
+    else dense.push(m[2])
+  }
+  return { relations, dense }
+}
+
 /**
  * Parse source and rebuild dataflow graph nodes/edges.
  * UI nodes and event edges from `prev` are preserved when endpoints still exist.
+ * Node positions are restored from `prev` when ids match (two-way friendly).
  */
 export function graphFromSource(
   source: string,
@@ -91,6 +125,14 @@ export function graphFromSource(
     const dataNodes: GraphNode[] = []
     const dataEdges: GraphEdge[] = []
     const seen = new Set<string>()
+    const pragmas = parseTensorPragmas(source)
+
+    for (const name of pragmas.relations) {
+      ensureRelation(name, dataNodes, seen)
+    }
+    for (const name of pragmas.dense) {
+      ensureTensor(name, dataNodes, seen)
+    }
 
     // Pass 1: collect unique relations from facts / rules / queries
     for (const stmt of prog.stmts) {
@@ -191,10 +233,34 @@ export function graphFromSource(
       }
     }
 
+    // Restore positions from previous graph (avoid dagre thrash on two-way edits)
+    for (const n of dataNodes) {
+      n.position = prevPosition(prev, n.id)
+    }
+
+    // Keep op nodes the user placed that are not yet reflected as AST (still in prev)
+    const OP_KEEP: NodeKind[] = [
+      'einsum',
+      'step',
+      'relu',
+      'sigmoid',
+      'softmax',
+      'rule',
+      'equation',
+    ]
+    for (const n of prev.nodes) {
+      if (OP_KEEP.includes(n.kind) && !seen.has(n.id)) {
+        // Keep if still referenced by a data edge or always keep floating ops
+        dataNodes.push(n)
+        seen.add(n.id)
+      }
+    }
+
     const uiNodes = prev.nodes.filter((n) => UI_KINDS.has(n.kind))
     for (const n of uiNodes) seen.add(n.id)
 
-    const allNodes = [...dataNodes, ...uiNodes]
+    let allNodes = [...dataNodes, ...uiNodes]
+    allNodes = applyPrevPositions(allNodes, prev)
     const nodeIds = new Set(allNodes.map((n) => n.id))
 
     const eventEdges = prev.edges.filter((e) => {
@@ -204,8 +270,50 @@ export function graphFromSource(
       return nodeIds.has(e.source) && targetOk
     })
 
-    const laidOut = layoutGraph(allNodes, dataEdges)
-    return { nodes: laidOut, edges: [...dataEdges, ...eventEdges] }
+    // Preserve data edges that involve kept op nodes from prev
+    const opIds = new Set(
+      allNodes.filter((n) => OP_KEEP.includes(n.kind)).map((n) => n.id),
+    )
+    const extraData = prev.edges.filter(
+      (e) =>
+        e.kind === 'data' &&
+        (opIds.has(e.source) || opIds.has(e.target)) &&
+        nodeIds.has(e.source) &&
+        nodeIds.has(e.target) &&
+        !dataEdges.some((d) => d.id === e.id),
+    )
+
+    // Only auto-layout nodes still at origin with no previous position
+    const needsLayout = allNodes.some(
+      (n) => n.position.x === 0 && n.position.y === 0 && !prev.nodes.some((p) => p.id === n.id),
+    )
+    if (needsLayout && prev.nodes.length === 0) {
+      allNodes = layoutGraph(allNodes, [...dataEdges, ...extraData])
+    } else {
+      // Place brand-new origin nodes to the right of existing content
+      let maxX = 0
+      let maxY = 0
+      for (const n of allNodes) {
+        if (n.position.x || n.position.y) {
+          maxX = Math.max(maxX, n.position.x)
+          maxY = Math.max(maxY, n.position.y)
+        }
+      }
+      let i = 0
+      allNodes = allNodes.map((n) => {
+        if (n.position.x === 0 && n.position.y === 0 && !prev.nodes.some((p) => p.id === n.id)) {
+          const pos = { x: maxX + 180 + (i % 3) * 40, y: 80 + Math.floor(i / 3) * 80 }
+          i++
+          return { ...n, position: pos }
+        }
+        return n
+      })
+    }
+
+    return {
+      nodes: allNodes,
+      edges: [...dataEdges, ...extraData, ...eventEdges],
+    }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     return { nodes: prev.nodes, edges: prev.edges, error: message }

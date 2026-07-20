@@ -19,6 +19,7 @@ import '@xyflow/react/dist/style.css'
 import { useProjectStore } from '@/store/projectStore'
 import type { GraphNode, GraphEdge, EdgeKind, NodeKind } from '@/types/project'
 import { ideBus } from '@/runtime/ideRuntime'
+import { pushGraphToSource } from '@/editor/pushGraphToSource'
 import { edgeTypes } from './edgeTypes'
 import { TLNode, kindColor, type TLNodeData } from './nodes/TLNode'
 import { Palette } from './Palette'
@@ -170,7 +171,16 @@ export function GraphCanvas() {
         sourceHandle,
         targetHandle,
       }
-      setGraph(graph.nodes, [...graph.edges, edge])
+      const nextEdges = [...graph.edges, edge]
+      setGraph(graph.nodes, nextEdges)
+      // Dataflow edges regenerate TensorLogic source (two-way)
+      if (kind === 'data') {
+        queueMicrotask(() => {
+          const srcL = sourceNode?.label ?? connection.source
+          const tgtL = targetNode?.label ?? connection.target
+          pushGraphToSource(`Wired ${srcL} → ${tgtL} → code updated`)
+        })
+      }
     },
     [graph.nodes, graph.edges, setGraph],
   )
