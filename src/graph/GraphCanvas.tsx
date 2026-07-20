@@ -61,30 +61,33 @@ const UI_EVENT_KINDS: ReadonlySet<NodeKind> = new Set([
 ])
 
 function toRFNode(n: GraphNode): Node<TLNodeData> {
+  // Flatten payload so TLNode can read role/caption/shape from data.*
   return {
     id: n.id,
     type: 'tl',
     position: n.position,
     data: {
-      ...n,
       label: n.label,
       kind: n.kind,
+      astId: n.astId,
+      ...n.data,
     },
   }
 }
 
 function fromRFNode(n: Node): GraphNode {
-  const d = n.data as TLNodeData & Partial<GraphNode>
+  const d = n.data as TLNodeData & Record<string, unknown>
   const kind = (d.kind ?? 'tensor') as NodeKind
   const label = String(d.label ?? kind)
-  const nested = (d as { data?: Record<string, unknown> }).data
+  const astId = typeof d.astId === 'string' ? d.astId : undefined
+  const { label: _l, kind: _k, astId: _a, ...payload } = d
   return {
     id: n.id,
     kind,
     label,
     position: n.position,
-    data: nested && typeof nested === 'object' && !Array.isArray(nested) ? nested : {},
-    astId: typeof d.astId === 'string' ? d.astId : undefined,
+    data: payload as Record<string, unknown>,
+    astId,
   }
 }
 
@@ -113,15 +116,17 @@ function fromRFEdge(e: Edge): GraphEdge {
   }
 }
 
-/** Fit the viewport whenever a project (example) is loaded so A/B boxes are visible. */
+/** Fit / focus when project loads or + New Tensor sets focusNodeId. */
 function FitViewOnLoad() {
   const projectId = useProjectStore((s) => s.project.id)
   const exampleId = useProjectStore((s) => s.project.meta.exampleId)
   const nodeCount = useProjectStore((s) => s.project.graph.nodes.length)
+  const focusNodeId = useProjectStore((s) => s.focusNodeId)
+  const setFocusNodeId = useProjectStore((s) => s.setFocusNodeId)
   const nodeSig = useProjectStore((s) =>
     s.project.graph.nodes.map((n) => n.id).join(','),
   )
-  const { fitView } = useReactFlow()
+  const { fitView, setCenter, getNode } = useReactFlow()
 
   useEffect(() => {
     if (nodeCount === 0) return
@@ -133,6 +138,25 @@ function FitViewOnLoad() {
     )
     return () => timers.forEach((t) => window.clearTimeout(t))
   }, [projectId, exampleId, nodeCount, nodeSig, fitView])
+
+  useEffect(() => {
+    if (!focusNodeId) return
+    const t = window.setTimeout(() => {
+      const n = getNode(focusNodeId)
+      if (n) {
+        const w = n.measured?.width ?? 160
+        const h = n.measured?.height ?? 90
+        setCenter(n.position.x + w / 2, n.position.y + h / 2, {
+          zoom: 1,
+          duration: 220,
+        })
+      } else {
+        fitView({ padding: 0.35, duration: 220, maxZoom: 1.2 })
+      }
+      setFocusNodeId(null)
+    }, 120)
+    return () => window.clearTimeout(t)
+  }, [focusNodeId, getNode, setCenter, fitView, setFocusNodeId, nodeSig])
 
   return null
 }
@@ -147,20 +171,29 @@ export function GraphCanvas() {
 
   const onNodesChange: OnNodesChange = useCallback(
     (changes) => {
-      const next = applyNodeChanges(changes, nodes)
+      // Always apply against the latest store graph (not a stale render snapshot),
+      // otherwise a dimensions/select event can wipe a just-added + New Tensor box.
+      const state = useProjectStore.getState()
+      const current = state.project.graph.nodes.map(toRFNode)
+      const next = applyNodeChanges(changes, current)
       const selected = next.find((n) => n.selected)
-      setSelected(selected?.id)
-      setGraph(next.map(fromRFNode), graph.edges)
+      if (selected) setSelected(selected.id)
+      setGraph(
+        next.map(fromRFNode),
+        state.project.graph.edges,
+      )
     },
-    [nodes, graph.edges, setGraph, setSelected],
+    [setGraph, setSelected],
   )
 
   const onEdgesChange: OnEdgesChange = useCallback(
     (changes) => {
-      const next = applyEdgeChanges(changes, edges)
-      setGraph(graph.nodes, next.map(fromRFEdge))
+      const state = useProjectStore.getState()
+      const current = state.project.graph.edges.map(toRFEdge)
+      const next = applyEdgeChanges(changes, current)
+      setGraph(state.project.graph.nodes, next.map(fromRFEdge))
     },
-    [edges, graph.nodes, setGraph],
+    [setGraph],
   )
 
   const onConnect: OnConnect = useCallback(

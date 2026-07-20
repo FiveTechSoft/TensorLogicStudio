@@ -57,6 +57,9 @@ interface ProjectState {
   spreadsheet: { name: string; mode: 'bool' | 'dense' } | null
   openSpreadsheet: (name: string, mode?: 'bool' | 'dense') => void
   closeSpreadsheet: () => void
+  /** Graph canvas should fit/focus this node id (set by + New Tensor). */
+  focusNodeId: string | null
+  setFocusNodeId: (id: string | null) => void
 }
 
 export const useProjectStore = create<ProjectState>((set) => ({
@@ -108,6 +111,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       queryBindings: [],
       lastRun: null,
       spreadsheet: null,
+      focusNodeId: null,
       // Keep intentional example layouts (e.g. A ──×── B boxes) for a few seconds
       // while Monaco settles, so source→graph does not wipe the canvas.
       skipNextSourceToGraph: true,
@@ -141,4 +145,6 @@ export const useProjectStore = create<ProjectState>((set) => ({
   openSpreadsheet: (name, mode = 'bool') =>
     set({ spreadsheet: { name, mode } }),
   closeSpreadsheet: () => set({ spreadsheet: null }),
+  focusNodeId: null,
+  setFocusNodeId: (focusNodeId) => set({ focusNodeId }),
 }))

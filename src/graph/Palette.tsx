@@ -1,7 +1,8 @@
 import { useProjectStore } from '@/store/projectStore'
 import type { GraphNode, NodeKind } from '@/types/project'
-import { nextOpLabel, nextTensorLabel } from '@/editor/graphToSource'
+import { nextOpLabel } from '@/editor/graphToSource'
 import { pushGraphToSource } from '@/editor/pushGraphToSource'
+import { addTensorBox } from './addTensor'
 import { kindColor } from './nodes/TLNode'
 
 const OP_KINDS: NodeKind[] = [
@@ -31,46 +32,15 @@ function opLabel(kind: NodeKind): string {
 
 function placeOffset(nodes: GraphNode[]): { x: number; y: number } {
   const n = nodes.length
-  return { x: 120 + (n % 4) * 40 + n * 12, y: 100 + Math.floor(n / 4) * 30 + n * 18 }
+  return { x: 140 + (n % 4) * 48, y: 120 + Math.floor(n / 4) * 70 }
 }
 
 export function Palette() {
-  const nodes = useProjectStore((s) => s.project.graph.nodes)
-  const edges = useProjectStore((s) => s.project.graph.edges)
-  const setGraph = useProjectStore((s) => s.setGraph)
-  const openSpreadsheet = useProjectStore((s) => s.openSpreadsheet)
-  const setSelected = useProjectStore((s) => s.setSelected)
   const setStatus = useProjectStore((s) => s.setStatus)
 
-  const addTensor = (kind: 'relation' | 'tensor') => {
-    const label = nextTensorLabel(nodes, kind)
-    const id = kind === 'relation' ? `relation:${label}` : `tensor:${label}`
-    // Avoid id collision if node already exists
-    const uniqueId = nodes.some((n) => n.id === id)
-      ? `${id}-${crypto.randomUUID().slice(0, 8)}`
-      : id
-    const node: GraphNode = {
-      id: uniqueId,
-      kind,
-      label,
-      position: placeOffset(nodes),
-      data: { createdVisually: true },
-    }
-    setGraph([...nodes, node], edges)
-    setSelected(node.id)
-    openSpreadsheet(label, kind === 'relation' ? 'bool' : 'dense')
-    // Defer so setGraph state is flushed
-    queueMicrotask(() => {
-      pushGraphToSource(
-        kind === 'relation'
-          ? `New relation tensor ${label} → code`
-          : `New dense tensor ${label} → code`,
-      )
-    })
-    setStatus(`Created ${kind} ${label}`)
-  }
-
   const addOp = (kind: NodeKind) => {
+    const s = useProjectStore.getState()
+    const { nodes, edges } = s.project.graph
     const label = nextOpLabel(nodes, kind)
     const node: GraphNode = {
       id: `op-${kind}-${crypto.randomUUID().slice(0, 8)}`,
@@ -79,11 +49,15 @@ export function Palette() {
       position: placeOffset(nodes),
       data: { createdVisually: true },
     }
-    setGraph([...nodes, node], edges)
-    setSelected(node.id)
-    queueMicrotask(() => {
-      pushGraphToSource(`Added operation ${label}`)
+    s.setGraph([...nodes, node], edges)
+    s.setSelected(node.id)
+    useProjectStore.setState({
+      focusNodeId: node.id,
+      skipNextSourceToGraph: true,
+      graphLockUntil: Date.now() + 1500,
     })
+    queueMicrotask(() => pushGraphToSource(`Added operation ${label}`))
+    setStatus(`Created op ${label}`)
   }
 
   return (
@@ -91,17 +65,17 @@ export function Palette() {
       <div className="pointer-events-auto flex flex-wrap items-center gap-1.5 rounded-md border border-slate-700/90 bg-[#0c1424]/95 p-1.5 backdrop-blur-sm shadow-lg shadow-black/40">
         <button
           type="button"
-          onClick={() => addTensor('relation')}
+          onClick={() => addTensorBox('relation')}
           className="px-3 py-1.5 rounded text-xs font-semibold border border-cyan-600/70 bg-cyan-950/50 text-cyan-300 hover:bg-cyan-900/50 transition-colors"
-          title="Create a Boolean / sparse tensor (relation). Then draw arrows to ops and other tensors — code updates on the left."
+          title="Add a tensor box on the canvas (Boolean / sparse relation)"
         >
           + New Tensor
         </button>
         <button
           type="button"
-          onClick={() => addTensor('tensor')}
+          onClick={() => addTensorBox('tensor')}
           className="px-2.5 py-1.5 rounded text-[11px] font-medium border border-slate-600 bg-slate-900/70 text-slate-200 hover:bg-slate-800 transition-colors"
-          title="Create a dense float tensor"
+          title="Add a dense float tensor box on the canvas"
         >
           + Dense
         </button>
@@ -120,7 +94,7 @@ export function Palette() {
         ))}
       </div>
       <div className="pointer-events-none text-[10px] text-slate-500 px-1">
-        Create 2 tensors → add an op → drag cyan handles to wire → code updates left
+        + New Tensor adds a box on this canvas · wire with cyan handles · code updates left
       </div>
     </div>
   )

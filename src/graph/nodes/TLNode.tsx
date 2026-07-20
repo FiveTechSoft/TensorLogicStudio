@@ -84,8 +84,11 @@ export function TLNode({ data }: NodeProps<TLRFNode>) {
   }
 
   const isMatrixBox =
-    kind === 'tensor' &&
-    (data.role === 'factor' || data.role === 'product' || caption != null)
+    (kind === 'tensor' || kind === 'relation') &&
+    (data.role === 'factor' ||
+      data.role === 'product' ||
+      data.createdVisually === true ||
+      caption != null)
 
   return (
     <div
