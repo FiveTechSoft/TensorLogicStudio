@@ -64,10 +64,12 @@ export function addTensorBox(kind: 'relation' | 'tensor' = 'relation'): string {
   })
 
   // Bring the box into the visible center of Tensor Graph (critical UX)
-  requestAnimationFrame(() => {
+  const reveal = () => {
     revealNodeInView(id)
     // Keep store position in sync with RF instance after reveal
-    window.setTimeout(() => {
+    const later =
+      typeof window !== 'undefined' ? window.setTimeout.bind(window) : setTimeout
+    later(() => {
       const rf = getReactFlowInstance()
       const rfNode = rf?.getNode(id)
       if (!rfNode) return
@@ -79,7 +81,13 @@ export function addTensorBox(kind: 'relation' | 'tensor' = 'relation'): string {
         cur.project.graph.edges,
       )
     }, 120)
-  })
+  }
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(reveal)
+  } else {
+    // Vitest/node has no rAF
+    setTimeout(reveal, 0)
+  }
 
   // Sync code after store has the new node
   queueMicrotask(() => {
