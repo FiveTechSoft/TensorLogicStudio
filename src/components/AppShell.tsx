@@ -1,9 +1,11 @@
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { Toolbar } from './Toolbar'
 import { StatusBar } from './StatusBar'
 import { ConsolePanel } from './ConsolePanel'
 import { CodeEditor } from '@/editor/CodeEditor'
+import { graphFromSource } from '@/editor/syncFromSource'
 import { GraphCanvas } from '@/graph/GraphCanvas'
+import { useProjectStore } from '@/store/projectStore'
 
 function PaneHeader({ children }: { children: ReactNode }) {
   return (
@@ -21,7 +23,35 @@ function PanePlaceholder({ label }: { label: string }) {
   )
 }
 
+/** Debounced source → graph dual-sync (300ms). */
+function useSourceToGraphSync() {
+  const source = useProjectStore((s) => s.project.source)
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      const {
+        project,
+        setGraph,
+        setParseError,
+        setGraphStale,
+      } = useProjectStore.getState()
+      const result = graphFromSource(project.source, project.graph)
+      setGraph(result.nodes, result.edges)
+      if (result.error) {
+        setParseError(result.error)
+        setGraphStale(true)
+      } else {
+        setParseError(null)
+        setGraphStale(false)
+      }
+    }, 300)
+    return () => window.clearTimeout(handle)
+  }, [source])
+}
+
 export function AppShell() {
+  useSourceToGraphSync()
+
   return (
     <div className="h-full flex flex-col bg-[#0b1220] text-slate-200">
       <Toolbar />
