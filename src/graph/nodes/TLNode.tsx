@@ -93,10 +93,16 @@ export function TLNode({ data }: NodeProps<TLRFNode>) {
   return (
     <div
       className={[
-        'rounded-lg border bg-[#0c1424]/95 shadow-lg shadow-black/30',
-        isMatrixBox ? 'min-w-[160px] min-h-[88px] px-4 py-3' : 'min-w-[140px] px-3 py-2',
+        'rounded-lg border shadow-lg shadow-black/40',
+        isMatrixBox
+          ? 'min-w-[168px] min-h-[96px] px-4 py-3 bg-slate-900'
+          : 'min-w-[140px] px-3 py-2 bg-slate-900/95',
       ].join(' ')}
-      style={{ borderColor: color, borderWidth: isMatrixBox ? 2 : 1 }}
+      style={{
+        borderColor: color,
+        borderWidth: isMatrixBox ? 2 : 1,
+        boxShadow: isMatrixBox ? `0 0 0 1px ${color}33, 0 8px 24px rgba(0,0,0,0.45)` : undefined,
+      }}
     >
       <Handle
         type="target"

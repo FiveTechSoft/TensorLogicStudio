@@ -19,3 +19,16 @@ html, body, #root {
   color: var(--text);
   font-family: ui-sans-serif, system-ui, sans-serif;
 }
+
+/* React Flow can leave nodes at visibility:hidden until measure completes.
+   That was hiding + New Tensor boxes even though they exist in the DOM. */
+.react-flow__node {
+  visibility: visible !important;
+}
+
+.react-flow__renderer,
+.react-flow__pane,
+.react-flow__viewport {
+  width: 100%;
+  height: 100%;
+}

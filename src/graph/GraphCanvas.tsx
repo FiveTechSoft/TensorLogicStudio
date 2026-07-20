@@ -7,6 +7,7 @@ import {
   applyNodeChanges,
   applyEdgeChanges,
   useReactFlow,
+  useNodesInitialized,
   type Node,
   type Edge,
   type OnNodesChange,
@@ -127,36 +128,44 @@ function FitViewOnLoad() {
     s.project.graph.nodes.map((n) => n.id).join(','),
   )
   const { fitView, setCenter, getNode } = useReactFlow()
+  const nodesInitialized = useNodesInitialized()
 
   useEffect(() => {
-    if (nodeCount === 0) return
-    const delays = [50, 200, 450, 800]
-    const timers = delays.map((ms) =>
-      window.setTimeout(() => {
-        fitView({ padding: 0.3, duration: 200, maxZoom: 1.2 })
-      }, ms),
-    )
-    return () => timers.forEach((t) => window.clearTimeout(t))
-  }, [projectId, exampleId, nodeCount, nodeSig, fitView])
-
-  useEffect(() => {
-    if (!focusNodeId) return
+    if (nodeCount === 0 || !nodesInitialized) return
     const t = window.setTimeout(() => {
-      const n = getNode(focusNodeId)
+      fitView({ padding: 0.3, duration: 200, maxZoom: 1.2 })
+    }, 60)
+    return () => window.clearTimeout(t)
+  }, [projectId, exampleId, nodeCount, nodeSig, fitView, nodesInitialized])
+
+  useEffect(() => {
+    if (!focusNodeId || !nodesInitialized) return
+    const id = focusNodeId
+    const run = () => {
+      const n = getNode(id)
       if (n) {
-        const w = n.measured?.width ?? 160
-        const h = n.measured?.height ?? 90
+        fitView({
+          nodes: [{ id }],
+          padding: 0.5,
+          duration: 200,
+          maxZoom: 1.2,
+          minZoom: 0.5,
+        })
+        const w = n.measured?.width ?? 170
+        const h = n.measured?.height ?? 100
         setCenter(n.position.x + w / 2, n.position.y + h / 2, {
           zoom: 1,
-          duration: 220,
+          duration: 200,
         })
-      } else {
-        fitView({ padding: 0.35, duration: 220, maxZoom: 1.2 })
       }
-      setFocusNodeId(null)
-    }, 120)
-    return () => window.clearTimeout(t)
-  }, [focusNodeId, getNode, setCenter, fitView, setFocusNodeId, nodeSig])
+    }
+    const timers = [50, 200, 400].map((ms) => window.setTimeout(run, ms))
+    const clear = window.setTimeout(() => setFocusNodeId(null), 500)
+    return () => {
+      timers.forEach((t) => window.clearTimeout(t))
+      window.clearTimeout(clear)
+    }
+  }, [focusNodeId, getNode, setCenter, fitView, setFocusNodeId, nodeSig, nodesInitialized])
 
   return null
 }
@@ -255,7 +264,7 @@ export function GraphCanvas() {
   )
 
   return (
-    <div className="relative flex-1 min-h-0 w-full">
+    <div className="relative flex-1 min-h-0 w-full h-full" style={{ minHeight: 320 }}>
       <Palette />
       <ReactFlow
         nodes={nodes}
@@ -273,6 +282,11 @@ export function GraphCanvas() {
         defaultEdgeOptions={{ type: 'data' }}
         minZoom={0.3}
         maxZoom={2}
+        nodesDraggable
+        nodesConnectable
+        elementsSelectable
+        onlyRenderVisibleElements={false}
+        style={{ width: '100%', height: '100%' }}
       >
         <FitViewOnLoad />
         <Background variant={BackgroundVariant.Dots} gap={18} size={1} color="#1e293b" />

@@ -4,12 +4,13 @@ import { useProjectStore } from '@/store/projectStore'
 import type { GraphNode } from '@/types/project'
 
 function placeOffset(nodes: GraphNode[]): { x: number; y: number } {
-  // Spread new boxes so they are obvious in the canvas center-ish
+  // Keep new boxes in a predictable band near the default fitView origin
+  // so they are not lost off-camera after genealogy/example layouts.
   const tensors = nodes.filter((n) => n.kind === 'relation' || n.kind === 'tensor')
   const i = tensors.length
   return {
-    x: 120 + (i % 3) * 200,
-    y: 140 + Math.floor(i / 3) * 140,
+    x: 80 + (i % 3) * 220,
+    y: 120 + Math.floor(i / 3) * 160,
   }
 }
 
