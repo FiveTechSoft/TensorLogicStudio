@@ -4,6 +4,7 @@ import { genealogyProject } from '@/examples/genealogy'
 import { matrixMultiplyProject } from '@/examples/matrixMultiply'
 import { mlpProject } from '@/examples/mlp'
 import {
+  ideRuntime,
   loadProjectIntoIde,
   runAndPublish,
   stepAndPublish,
@@ -11,7 +12,7 @@ import {
   type InspectorActions,
 } from '@/runtime/ideRuntime'
 import { downloadProject, openProjectFile, saveSession } from '@/persistence/fileIo'
-import type { Project } from '@/types/project'
+import { emptyProject, type Project } from '@/types/project'
 
 const btnClass =
   'px-3 py-1 rounded border border-slate-700 bg-slate-900/60 text-slate-200 text-xs font-medium hover:bg-slate-800 hover:border-slate-600 active:bg-slate-700 transition-colors'
@@ -110,6 +111,33 @@ export function Toolbar() {
     setExamplesOpen(false)
   }
 
+  const handleNew = () => {
+    const s = useProjectStore.getState()
+    const hasWork =
+      s.project.source.trim().length > 0 ||
+      s.project.graph.nodes.length > 0 ||
+      s.project.graph.edges.length > 0
+    if (hasWork) {
+      const ok = window.confirm(
+        '¿Crear un proyecto nuevo y borrar el canvas, el código y los resultados?',
+      )
+      if (!ok) return
+    }
+    const blank = emptyProject('untitled')
+    blank.source = '% empty project\n'
+    loadProjectIntoIde(blank)
+    ideRuntime.clearDense()
+    // loadProject already clears matrices; ensure runtime sparse is empty
+    try {
+      ideRuntime.loadSource(blank.source)
+    } catch {
+      /* ignore */
+    }
+    saveSession(blank)
+    s.setStatus('New project')
+    useProjectStore.getState().appendConsole('New project — canvas cleared')
+  }
+
   return (
     <header className="flex items-center gap-4 px-4 py-2 border-b border-slate-800 bg-[#0c1424] shrink-0">
       <div className="flex items-center gap-3 min-w-0">
@@ -123,6 +151,15 @@ export function Toolbar() {
       </div>
 
       <div className="flex items-center gap-1.5 ml-auto">
+        <button
+          type="button"
+          className={`${btnClass} border-sky-800/60 text-sky-300 hover:border-sky-600`}
+          onClick={handleNew}
+          title="New project — clear code, graph, and results"
+        >
+          New
+        </button>
+        <span className="w-px h-4 bg-slate-700 mx-1" aria-hidden />
         <button
           type="button"
           className={btnClass}
