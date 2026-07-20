@@ -1,18 +1,22 @@
 import { ViewportPortal, useStore } from '@xyflow/react'
 import { useProjectStore } from '@/store/projectStore'
+import { symbolForOp } from './edgeOps'
 
 /**
  * Draws data edges in flow coordinates (inside the viewport transform).
- * Reliable fallback when the built-in edge renderer does not paint.
+ * Click the symbol on the arrow to change the operation (+, ×, …).
  */
-export function DataArrowsOverlay() {
+export function DataArrowsOverlay({
+  onEdgeClick,
+}: {
+  onEdgeClick?: (edgeId: string, sourceId: string, targetId: string) => void
+}) {
   const edges = useProjectStore((s) => s.project.graph.edges)
   const nodeLookup = useStore((s) => s.nodeLookup)
-  // Re-render when nodes move / resize
   const nodeOrigin = useStore((s) => s.nodeOrigin)
+  void nodeOrigin
 
   const dataEdges = edges.filter((e) => e.kind === 'data')
-  void nodeOrigin
 
   return (
     <ViewportPortal>
@@ -51,7 +55,6 @@ export function DataArrowsOverlay() {
           const sh = s.measured?.height ?? s.height ?? 110
           const th = t.measured?.height ?? t.height ?? 110
 
-          // Offset for ViewportPortal SVG origin (-1000,-1000)
           const ox = 1000
           const oy = 1000
           const x1 = s.position.x + sw + ox
@@ -62,6 +65,7 @@ export function DataArrowsOverlay() {
           const d = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`
           const mx = (x1 + x2) / 2
           const my = (y1 + y2) / 2 - 4
+          const sym = e.label || symbolForOp(e.op) || '→'
 
           return (
             <g key={e.id}>
@@ -72,18 +76,35 @@ export function DataArrowsOverlay() {
                 strokeWidth={3}
                 markerEnd="url(#tls-arrowhead)"
               />
-              <circle cx={mx} cy={my} r={12} fill="#0c1424" stroke="#38bdf8" strokeWidth={1.5} />
-              <text
-                x={mx}
-                y={my}
-                textAnchor="middle"
-                dominantBaseline="central"
-                fill="#7dd3fc"
-                fontSize={13}
-                fontWeight={700}
+              {/* Clickable op badge */}
+              <g
+                style={{ pointerEvents: 'auto', cursor: 'pointer' }}
+                onClick={(ev) => {
+                  ev.stopPropagation()
+                  onEdgeClick?.(e.id, e.source, e.target)
+                }}
               >
-                {e.label && e.label !== '→' ? e.label : '→'}
-              </text>
+                <circle
+                  cx={mx}
+                  cy={my}
+                  r={14}
+                  fill="#0c1424"
+                  stroke="#38bdf8"
+                  strokeWidth={1.5}
+                />
+                <text
+                  x={mx}
+                  y={my}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fill="#7dd3fc"
+                  fontSize={12}
+                  fontWeight={700}
+                >
+                  {sym}
+                </text>
+                <title>Clic para cambiar operación (+, ×, copy…)</title>
+              </g>
             </g>
           )
         })}

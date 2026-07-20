@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, type MouseEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import {
   ReactFlow,
   Background,
@@ -23,12 +23,14 @@ import {
 import '@xyflow/react/dist/style.css'
 
 import { useProjectStore } from '@/store/projectStore'
-import type { GraphNode, GraphEdge, EdgeKind, NodeKind } from '@/types/project'
+import type { GraphNode, GraphEdge, EdgeKind, EdgeOp, NodeKind } from '@/types/project'
 import { ideBus } from '@/runtime/ideRuntime'
 import { pushGraphToSource } from '@/editor/pushGraphToSource'
 import { TLNode, kindColor, type TLNodeData } from './nodes/TLNode'
 import { Palette } from './Palette'
 import { DataArrowsOverlay } from './DataArrowsOverlay'
+import { EdgeOpPicker, type PendingLink } from './EdgeOpPicker'
+import { symbolForOp } from './edgeOps'
 import { setReactFlowInstance } from './rfApi'
 
 const nodeTypes: NodeTypes = {
@@ -146,7 +148,11 @@ function FitViewOnLoad() {
 }
 
 /** Shared helper: create a data edge between two nodes and sync code. */
-export function connectDataNodes(sourceId: string, targetId: string): boolean {
+export function connectDataNodes(
+  sourceId: string,
+  targetId: string,
+  op: EdgeOp = 'copy',
+): boolean {
   if (!sourceId || !targetId || sourceId === targetId) return false
   const state = useProjectStore.getState()
   const nodesNow = state.project.graph.nodes
@@ -159,28 +165,66 @@ export function connectDataNodes(sourceId: string, targetId: string): boolean {
     (e) => e.source === sourceId && e.target === targetId && e.kind === 'data',
   )
   if (dup) {
-    state.setStatus('Ya existe esa flecha')
-    return false
+    // Update op on existing edge instead of rejecting
+    const symbol = symbolForOp(op)
+    const edges = edgesNow.map((e) =>
+      e.source === sourceId && e.target === targetId && e.kind === 'data'
+        ? { ...e, op, label: symbol }
+        : e,
+    )
+    state.setGraph(nodesNow, edges)
+    state.setStatus(`Op actualizada: ${sourceNode.label} ${symbol} ${targetNode.label}`)
+    queueMicrotask(() =>
+      pushGraphToSource(`Updated edge op ${op}`),
+    )
+    return true
   }
 
+  const symbol = symbolForOp(op)
   const edge: GraphEdge = {
     id: `e-${crypto.randomUUID()}`,
     kind: 'data',
     source: sourceId,
     target: targetId,
-    label: '→',
+    label: symbol,
+    op,
   }
   state.setGraph(nodesNow, [...edgesNow, edge])
   useProjectStore.setState({
     graphLockUntil: Date.now() + 2500,
     skipNextSourceToGraph: true,
   })
-  state.setStatus(`Flecha: ${sourceNode.label} → ${targetNode.label}`)
-  state.appendConsole(`Arrow ${sourceNode.label} → ${targetNode.label}`)
+  state.setStatus(`Flecha ${symbol}: ${sourceNode.label} → ${targetNode.label}`)
+  state.appendConsole(
+    `Arrow ${sourceNode.label} ${symbol} ${targetNode.label} (${op})`,
+  )
   queueMicrotask(() => {
-    pushGraphToSource(`Wired ${sourceNode.label} → ${targetNode.label}`)
+    pushGraphToSource(
+      `Wired ${sourceNode.label} ${symbol} ${targetNode.label}`,
+    )
   })
   return true
+}
+
+/** Called when user finishes a connection: open op picker instead of default copy. */
+let pendingLinkHandler: ((sourceId: string, targetId: string) => void) | null =
+  null
+
+export function setPendingLinkHandler(
+  fn: ((sourceId: string, targetId: string) => void) | null,
+): void {
+  pendingLinkHandler = fn
+}
+
+export function requestLinkWithOpPicker(
+  sourceId: string,
+  targetId: string,
+): void {
+  if (pendingLinkHandler) {
+    pendingLinkHandler(sourceId, targetId)
+  } else {
+    connectDataNodes(sourceId, targetId, 'copy')
+  }
 }
 
 export function GraphCanvas() {
@@ -190,6 +234,15 @@ export function GraphCanvas() {
   const setSelected = useProjectStore((s) => s.setSelected)
   // Two-click link mode: first click on source handle, second on target
   const linkFromRef = useRef<string | null>(null)
+  const [pending, setPending] = useState<PendingLink | null>(null)
+
+  // Register op-picker for connectDataNodes path
+  useEffect(() => {
+    setPendingLinkHandler((sourceId, targetId) => {
+      setPending({ sourceId, targetId })
+    })
+    return () => setPendingLinkHandler(null)
+  }, [])
 
   const nodes = useMemo(
     () => graph.nodes.map((n) => toRFNode(n, selectedId)),
@@ -324,7 +377,7 @@ export function GraphCanvas() {
 
   const onConnect: OnConnect = useCallback((connection) => {
     if (!connection.source || !connection.target) return
-    connectDataNodes(connection.source, connection.target)
+    requestLinkWithOpPicker(connection.source, connection.target)
     linkFromRef.current = null
   }, [])
 
@@ -452,14 +505,18 @@ export function GraphCanvas() {
             targetId = nodeEl.dataset.id
           }
           if (targetId && targetId !== from) {
-            connectDataNodes(from, targetId)
+            requestLinkWithOpPicker(from, targetId)
           }
           linkFromRef.current = null
         }}
       >
         <FitViewOnLoad />
         <Background variant={BackgroundVariant.Dots} gap={18} size={1} color="#1e293b" />
-        <DataArrowsOverlay />
+        <DataArrowsOverlay
+          onEdgeClick={(edgeId, sourceId, targetId) => {
+            setPending({ edgeId, sourceId, targetId })
+          }}
+        />
         <Controls className="!bg-slate-900 !border-slate-700 !shadow-none" />
         <MiniMap
           nodeColor={(n) => kindColor(String((n.data as TLNodeData | undefined)?.kind ?? ''))}
@@ -467,6 +524,9 @@ export function GraphCanvas() {
           className="!bg-[#0c1424] !border-slate-800"
         />
       </ReactFlow>
+      {pending && (
+        <EdgeOpPicker pending={pending} onClose={() => setPending(null)} />
+      )}
     </div>
   )
 }

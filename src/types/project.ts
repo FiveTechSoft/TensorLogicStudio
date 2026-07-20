@@ -19,6 +19,20 @@ export interface GraphNode {
 
 export type EdgeKind = 'data' | 'event'
 
+/**
+ * Operation encoded on a data edge (TensorLogic semantics).
+ * Shown on the arrow and used to generate rules/equations.
+ */
+export type EdgeOp =
+  | 'copy' // B = A / B(X,Y) :- A(X,Y)
+  | 'mul' // elementwise B[i] = A[i] * C[i] — with one source: needs second input via join
+  | 'add' // elementwise sum (needs 2 sources into target; 1-edge: B[i] = A[i] + A[i] skipped)
+  | 'matmul' // matrix product B[i,k] = A[i,j] * W[j,k] — 1 edge: target uses matmul pattern with another inbound
+  | 'join' // bool compose: B(X,Z) :- A(X,Y), Other(Y,Z)
+  | 'relu'
+  | 'sigmoid'
+  | 'step'
+
 export interface GraphEdge {
   id: string
   kind: EdgeKind
@@ -26,7 +40,10 @@ export interface GraphEdge {
   target: string
   sourceHandle?: string
   targetHandle?: string
+  /** Display label on the arrow (×, +, →, …) */
   label?: string
+  /** TensorLogic operation for this link */
+  op?: EdgeOp
 }
 
 export interface Project {

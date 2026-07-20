@@ -3,6 +3,20 @@ import { synthesizeSourceFromGraph, nextTensorLabel } from './graphToSource'
 import type { GraphNode, GraphEdge } from '@/types/project'
 
 describe('synthesizeSourceFromGraph', () => {
+  it('uses edge op for multiply equation', () => {
+    const nodes: GraphNode[] = [
+      { id: 'tensor-A', kind: 'tensor', label: 'A', position: { x: 0, y: 0 }, data: {} },
+      { id: 'tensor-B', kind: 'tensor', label: 'B', position: { x: 0, y: 0 }, data: {} },
+      { id: 'tensor-C', kind: 'tensor', label: 'C', position: { x: 0, y: 0 }, data: {} },
+    ]
+    const edges: GraphEdge[] = [
+      { id: 'e1', kind: 'data', source: 'tensor-A', target: 'tensor-C', op: 'matmul', label: '×·' },
+      { id: 'e2', kind: 'data', source: 'tensor-B', target: 'tensor-C', op: 'matmul', label: '×·' },
+    ]
+    const src = synthesizeSourceFromGraph(nodes, edges, '')
+    expect(src).toContain('C[i,k] = A[i,j] * B[j,k].')
+  })
+
   it('creates join rule from two relations through einsum', () => {
     const nodes: GraphNode[] = [
       { id: 'relation-R1', kind: 'relation', label: 'R1', position: { x: 0, y: 0 }, data: {} },

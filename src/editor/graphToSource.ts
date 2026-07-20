@@ -1,4 +1,5 @@
 import { parse } from '@/core/parser/parse'
+import { linesForTarget } from '@/graph/edgeOps'
 import type { GraphEdge, GraphNode, NodeKind } from '@/types/project'
 
 const DATA_KINDS: ReadonlySet<NodeKind> = new Set([
@@ -112,24 +113,28 @@ export function synthesizeSourceFromGraph(
   const seenRule = new Set<string>()
   const seenEq = new Set<string>()
 
-  // Direct data edges tensor/relation → tensor/relation (no op): identity / copy
+  // Direct data edges into each data-node target, grouped by op on the edge
+  const byTarget = new Map<string, { edge: GraphEdge; source: GraphNode }[]>()
   for (const e of dataEdges(edges)) {
     const src = nodes.find((n) => n.id === e.source)
     const tgt = nodes.find((n) => n.id === e.target)
     if (!src || !tgt) continue
     if (!isDataNode(src) || !isDataNode(tgt)) continue
-    const a = sanitizeName(src.label, 'A')
-    const b = sanitizeName(tgt.label, 'B')
-    if (a === b) continue
-    if (src.kind === 'relation' && tgt.kind === 'relation') {
-      const line = `${b}(X, Y) :- ${a}(X, Y).`
-      if (!seenRule.has(line)) {
-        seenRule.add(line)
-        ruleLines.push(line)
-      }
-    } else {
-      const line = `${b}[i] = ${a}[i].`
-      if (!seenEq.has(line)) {
+    if (sanitizeName(src.label, 'A') === sanitizeName(tgt.label, 'B')) continue
+    const list = byTarget.get(tgt.id) ?? []
+    list.push({ edge: e, source: src })
+    byTarget.set(tgt.id, list)
+  }
+  for (const [tid, inbound] of byTarget) {
+    const tgt = nodes.find((n) => n.id === tid)
+    if (!tgt) continue
+    for (const line of linesForTarget(tgt, inbound)) {
+      if (line.includes(':-')) {
+        if (!seenRule.has(line)) {
+          seenRule.add(line)
+          ruleLines.push(line)
+        }
+      } else if (!seenEq.has(line)) {
         seenEq.add(line)
         equationLines.push(line)
       }
