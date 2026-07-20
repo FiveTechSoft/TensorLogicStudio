@@ -3,6 +3,7 @@ import { Toolbar } from './Toolbar'
 import { StatusBar } from './StatusBar'
 import { ConsolePanel } from './ConsolePanel'
 import { CodeEditor } from '@/editor/CodeEditor'
+import { GraphCanvas } from '@/graph/GraphCanvas'
 
 function PaneHeader({ children }: { children: ReactNode }) {
   return (
@@ -35,7 +36,7 @@ export function AppShell() {
 
         <section className="border-r border-slate-800 min-h-0 flex flex-col">
           <PaneHeader>Tensor Graph</PaneHeader>
-          <PanePlaceholder label="Graph canvas" />
+          <GraphCanvas />
         </section>
 
         <section className="min-h-0 flex flex-col bg-[#0c1424]/80">
