@@ -1,22 +1,9 @@
 import type { Project } from '@/types/project'
 
 /**
- * C = A × B
+ * C = A × B — layout tuned so A and B are large, centered boxes in Tensor Graph.
  *
- * Central column layout (must be visible on load):
- *
- *     ┌─────────┐         ┌─────────┐
- *     │  A 2×2  │ ──(×)──►│  B 2×2  │
- *     └─────────┘         └─────────┘
- *              \           /
- *               \         /
- *                ▼       ▼
- *                 [  ×  ]
- *                    │
- *                    ▼
- *                 ┌─────┐
- *                 │  C  │
- *                 └─────┘
+ *     [ A ]  ──(×)──►  [ B ]
  */
 
 const SOURCE = `% Matrix multiply: C = A × B
@@ -40,8 +27,7 @@ export const matrixMultiplyProject: Project = {
         id: 'tensor:A',
         kind: 'tensor',
         label: 'A',
-        // Prominent center-left
-        position: { x: 80, y: 140 },
+        position: { x: 60, y: 160 },
         data: {
           role: 'factor',
           shape: [2, 2],
@@ -52,8 +38,7 @@ export const matrixMultiplyProject: Project = {
         id: 'tensor:B',
         kind: 'tensor',
         label: 'B',
-        // Prominent center-right — same row as A so both “cajas” are obvious
-        position: { x: 380, y: 140 },
+        position: { x: 420, y: 160 },
         data: {
           role: 'factor',
           shape: [2, 2],
@@ -64,7 +49,7 @@ export const matrixMultiplyProject: Project = {
         id: 'op-mul',
         kind: 'einsum',
         label: '×',
-        position: { x: 250, y: 300 },
+        position: { x: 270, y: 320 },
         data: {
           op: 'matmul',
           symbol: '×',
@@ -74,7 +59,7 @@ export const matrixMultiplyProject: Project = {
         id: 'tensor:C',
         kind: 'tensor',
         label: 'C',
-        position: { x: 220, y: 420 },
+        position: { x: 240, y: 440 },
         data: {
           role: 'product',
           shape: [2, 2],
@@ -85,12 +70,11 @@ export const matrixMultiplyProject: Project = {
         id: 'ex-run',
         kind: 'run',
         label: 'Run',
-        position: { x: 560, y: 40 },
+        position: { x: 620, y: 40 },
         data: {},
       },
     ],
     edges: [
-      // Signature visual: two boxes joined by (×)
       {
         id: 'e-a-b-mul',
         kind: 'data',

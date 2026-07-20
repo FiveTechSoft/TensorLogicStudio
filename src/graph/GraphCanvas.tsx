@@ -116,16 +116,23 @@ function fromRFEdge(e: Edge): GraphEdge {
 /** Fit the viewport whenever a project (example) is loaded so A/B boxes are visible. */
 function FitViewOnLoad() {
   const projectId = useProjectStore((s) => s.project.id)
+  const exampleId = useProjectStore((s) => s.project.meta.exampleId)
   const nodeCount = useProjectStore((s) => s.project.graph.nodes.length)
+  const nodeSig = useProjectStore((s) =>
+    s.project.graph.nodes.map((n) => n.id).join(','),
+  )
   const { fitView } = useReactFlow()
 
   useEffect(() => {
     if (nodeCount === 0) return
-    const t = window.setTimeout(() => {
-      fitView({ padding: 0.25, duration: 280, maxZoom: 1.15 })
-    }, 80)
-    return () => window.clearTimeout(t)
-  }, [projectId, nodeCount, fitView])
+    const delays = [50, 200, 450, 800]
+    const timers = delays.map((ms) =>
+      window.setTimeout(() => {
+        fitView({ padding: 0.3, duration: 200, maxZoom: 1.2 })
+      }, ms),
+    )
+    return () => timers.forEach((t) => window.clearTimeout(t))
+  }, [projectId, exampleId, nodeCount, nodeSig, fitView])
 
   return null
 }

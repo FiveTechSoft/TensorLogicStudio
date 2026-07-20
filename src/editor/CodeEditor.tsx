@@ -17,7 +17,14 @@ export function CodeEditor() {
           theme="vs-dark"
           defaultLanguage="plaintext"
           value={source}
-          onChange={(v) => setSource(v ?? '')}
+          onChange={(v) => {
+            const next = v ?? ''
+            // Monaco often fires onChange when `value` is set programmatically
+            // (loading an example). Ignore no-ops so we don't clear graph lock
+            // and wipe the Tensor Graph layout.
+            if (next === useProjectStore.getState().project.source) return
+            setSource(next)
+          }}
           options={{
             fontSize: 13,
             minimap: { enabled: false },
@@ -27,7 +34,9 @@ export function CodeEditor() {
         />
       </div>
       {parseError && (
-        <div className="text-xs text-red-400 px-2 py-1 border-t border-slate-800 shrink-0">{parseError}</div>
+        <div className="text-xs text-red-400 px-2 py-1 border-t border-slate-800 shrink-0">
+          {parseError}
+        </div>
       )}
     </div>
   )

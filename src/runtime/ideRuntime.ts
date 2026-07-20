@@ -22,8 +22,25 @@ export function applyProjectDenseSeeds(project: Project): void {
 
 /** Load a project into the store and seed any dense tensors for the runtime. */
 export function loadProjectIntoIde(project: Project): void {
-  useProjectStore.getState().loadProject(project)
-  applyProjectDenseSeeds(project)
+  const p = project
+  useProjectStore.getState().loadProject(p)
+  applyProjectDenseSeeds(p)
+  // Re-assert designed graph after Monaco / effects settle (prevents empty canvas).
+  const snapshot = {
+    id: p.id,
+    nodes: p.graph.nodes.map((n) => ({ ...n, position: { ...n.position }, data: { ...n.data } })),
+    edges: p.graph.edges.map((e) => ({ ...e })),
+  }
+  window.setTimeout(() => {
+    const s = useProjectStore.getState()
+    if (s.project.id !== snapshot.id) return
+    s.setGraph(snapshot.nodes, snapshot.edges)
+    useProjectStore.setState({
+      skipNextSourceToGraph: true,
+      graphLockUntil: Date.now() + 1500,
+      status: `Loaded ${s.project.name}`,
+    })
+  }, 350)
 }
 
 /** Emit `${queryNodeId}:onMatch` when the last publish produced bindings. */

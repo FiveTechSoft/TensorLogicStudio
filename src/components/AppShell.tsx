@@ -107,7 +107,7 @@ function buildEventActions(nodes: GraphNode[]): Record<string, Record<string, ()
   return actions
 }
 
-/** Debounced source → graph dual-sync (300ms). Skips when source came from the graph. */
+/** Debounced source → graph dual-sync (300ms). Skips after graph-driven edits / project load. */
 function useSourceToGraphSync() {
   const source = useProjectStore((s) => s.project.source)
 
@@ -118,8 +118,43 @@ function useSourceToGraphSync() {
         useProjectStore.setState({ skipNextSourceToGraph: false })
         return
       }
+      if (Date.now() < state.graphLockUntil) {
+        return
+      }
+      // Examples with a designed graph: never auto-destroy layout from source sync
+      // unless the user cleared the graph. Re-apply stored positions for matching ids.
       const { project, setGraph, setParseError, setGraphStale } = state
+      const preserveLayout =
+        Boolean(project.meta.exampleId) && project.graph.nodes.length > 0
+
       const result = graphFromSource(project.source, project.graph)
+      if (preserveLayout && !result.error) {
+        // Merge: keep example nodes/edges that source rebuild would drop (× badge edge, op node styling)
+        const byId = new Map(result.nodes.map((n) => [n.id, n]))
+        for (const n of project.graph.nodes) {
+          if (!byId.has(n.id)) {
+            byId.set(n.id, n)
+          } else {
+            // Prefer example visual metadata + position
+            const built = byId.get(n.id)!
+            byId.set(n.id, {
+              ...built,
+              position: n.position,
+              data: { ...built.data, ...n.data },
+              label: n.label || built.label,
+            })
+          }
+        }
+        const edgeById = new Map(result.edges.map((e) => [e.id, e]))
+        for (const e of project.graph.edges) {
+          if (!edgeById.has(e.id)) edgeById.set(e.id, e)
+        }
+        setGraph([...byId.values()], [...edgeById.values()])
+        setParseError(null)
+        setGraphStale(false)
+        return
+      }
+
       setGraph(result.nodes, result.edges)
       if (result.error) {
         setParseError(result.error)

@@ -36,6 +36,8 @@ interface ProjectState {
   setSourceFromGraph: (source: string) => void
   /** When true, next source→graph sync is skipped once. */
   skipNextSourceToGraph: boolean
+  /** Ignore source→graph until this timestamp (ms since epoch). */
+  graphLockUntil: number
   setGraph: (nodes: GraphNode[], edges: GraphEdge[]) => void
   loadProject: (p: Project) => void
   setSelected: (id?: string) => void
@@ -69,11 +71,12 @@ export const useProjectStore = create<ProjectState>((set) => ({
   queryBindings: [],
   lastRun: null,
   skipNextSourceToGraph: false,
+  graphLockUntil: 0,
   setSource: (source) =>
     set((s) => ({
       project: { ...s.project, source, meta: { ...s.project.meta, updatedAt: new Date().toISOString() } },
       sourceDirty: true,
-      skipNextSourceToGraph: false,
+      // Do not clear graph lock here — programmatic loads must keep their canvas.
     })),
   setSourceFromGraph: (source) =>
     set((s) => ({
@@ -84,6 +87,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       },
       sourceDirty: true,
       skipNextSourceToGraph: true,
+      graphLockUntil: Date.now() + 500,
       graphStale: false,
       parseError: null,
     })),
@@ -104,9 +108,10 @@ export const useProjectStore = create<ProjectState>((set) => ({
       queryBindings: [],
       lastRun: null,
       spreadsheet: null,
-      // Keep the project graph (examples have intentional layouts).
-      // Otherwise source→graph rebuild would wipe A/B boxes on load.
+      // Keep intentional example layouts (e.g. A ──×── B boxes) for a few seconds
+      // while Monaco settles, so source→graph does not wipe the canvas.
       skipNextSourceToGraph: true,
+      graphLockUntil: Date.now() + 2500,
     }),
   setSelected: (id) =>
     set((s) => ({ project: { ...s.project, ui: { ...s.project.ui, selectedId: id } } })),
