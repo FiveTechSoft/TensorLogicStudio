@@ -13,6 +13,8 @@ export interface ForwardOptions {
   maxIters?: number
   /** If set, run at most this many semi-naive iterations (for step). */
   maxSteps?: number
+  /** Called between iterations; return true to abort early. */
+  shouldStop?: () => boolean
   onIteration?: (info: {
     iteration: number
     added: number
@@ -161,6 +163,7 @@ export function forwardChain(
 
   const steps = Math.min(maxIters, maxSteps)
   for (let iter = 0; iter < steps; iter++) {
+    if (opts.shouldStop?.()) break
     let added = 0
     for (const rule of rules) {
       const derived = deriveHead(rule, relations)

@@ -24,6 +24,7 @@ export class Runtime {
   private dense = new Map<string, DenseTensor>()
   private traces: TraceEvent[] = []
   private lastFixpoint = false
+  private stopRequested = false
 
   loadSource(source: string): void {
     this.source = source
@@ -34,6 +35,7 @@ export class Runtime {
     // Only sparse relations are rebuilt from facts.
     this.traces = []
     this.lastFixpoint = false
+    this.stopRequested = false
     this.traces.push({
       iteration: 0,
       message: `loaded ${this.ir.facts.length} facts, ${this.ir.rules.length} rules, ${this.ir.equations.length} equation(s)`,
@@ -48,8 +50,14 @@ export class Runtime {
     this.dense.set(name, seedDenseTensor(shape, rowMajorValues))
   }
 
+  /** Request cooperative stop of an in-progress run / step loop. */
+  stop(): void {
+    this.stopRequested = true
+  }
+
   run(opts: { mode: RunMode }): RunResult {
     const t0 = performance.now()
+    this.stopRequested = false
     if (!this.ir) {
       return { fixpoint: true, iterations: 0, ms: 0 }
     }
@@ -57,6 +65,7 @@ export class Runtime {
     if (opts.mode === 'forward') {
       const result = forwardChain(this.relations, this.ir.rules, {
         maxIters: 64,
+        shouldStop: () => this.stopRequested,
         onIteration: ({ iteration, added }) => {
           if (added > 0) {
             this.traces.push({
@@ -69,7 +78,7 @@ export class Runtime {
       })
       this.lastFixpoint = result.fixpoint
 
-      if (this.ir.equations.length > 0) {
+      if (!this.stopRequested && this.ir.equations.length > 0) {
         evaluateEquations(this.ir.equations, this.dense)
         this.traces.push({
           iteration: result.iterations,
@@ -78,11 +87,14 @@ export class Runtime {
       }
 
       const ms = performance.now() - t0
+      const stopped = this.stopRequested
       this.traces.push({
         iteration: result.iterations,
-        message: result.fixpoint
-          ? `fixpoint reached after ${result.iterations} iteration(s)`
-          : `stopped after ${result.iterations} iteration(s) (no fixpoint)`,
+        message: stopped
+          ? `stopped by user after ${result.iterations} iteration(s)`
+          : result.fixpoint
+            ? `fixpoint reached after ${result.iterations} iteration(s)`
+            : `stopped after ${result.iterations} iteration(s) (no fixpoint)`,
         newFacts: result.addedTotal,
         ms,
       })
@@ -109,12 +121,14 @@ export class Runtime {
   /** Run a single forward-chaining iteration. */
   step(): RunResult {
     const t0 = performance.now()
+    this.stopRequested = false
     if (!this.ir) {
       return { fixpoint: true, iterations: 0, ms: 0 }
     }
     const result = forwardChain(this.relations, this.ir.rules, {
       maxIters: 64,
       maxSteps: 1,
+      shouldStop: () => this.stopRequested,
       onIteration: ({ iteration, added }) => {
         this.traces.push({
           iteration,
@@ -139,6 +153,25 @@ export class Runtime {
 
   getDense(name: string): DenseTensor | undefined {
     return this.dense.get(name)
+  }
+
+  /** Names of all sparse relations currently held. */
+  listRelations(): string[] {
+    return [...this.relations.keys()].sort()
+  }
+
+  /** Names of all dense tensors currently held. */
+  listDenseNames(): string[] {
+    return [...this.dense.keys()].sort()
+  }
+
+  /** Queries from the last loaded IR, if any. */
+  getQueries() {
+    return this.ir?.queries ?? []
+  }
+
+  getIr(): IrProgram | null {
+    return this.ir
   }
 
   getTrace(): TraceEvent[] {
