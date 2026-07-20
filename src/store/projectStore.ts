@@ -43,6 +43,14 @@ interface ProjectState {
   setMatrices: (m: MatrixEntry[]) => void
   setQueryBindings: (b: Record<string, string>[]) => void
   setLastRun: (info: LastRunInfo | null) => void
+  setDenseSeed: (
+    name: string,
+    seed: { shape: number[]; data: number[] },
+  ) => void
+  /** Relation/tensor currently open in spreadsheet editor */
+  spreadsheet: { name: string; mode: 'bool' | 'dense' } | null
+  openSpreadsheet: (name: string, mode?: 'bool' | 'dense') => void
+  closeSpreadsheet: () => void
 }
 
 export const useProjectStore = create<ProjectState>((set) => ({
@@ -77,6 +85,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       matrices: [],
       queryBindings: [],
       lastRun: null,
+      spreadsheet: null,
     }),
   setSelected: (id) =>
     set((s) => ({ project: { ...s.project, ui: { ...s.project.ui, selectedId: id } } })),
@@ -88,4 +97,22 @@ export const useProjectStore = create<ProjectState>((set) => ({
   setMatrices: (matrices) => set({ matrices }),
   setQueryBindings: (queryBindings) => set({ queryBindings }),
   setLastRun: (lastRun) => set({ lastRun }),
+  setDenseSeed: (name, seed) =>
+    set((s) => ({
+      project: {
+        ...s.project,
+        meta: {
+          ...s.project.meta,
+          updatedAt: new Date().toISOString(),
+          denseSeeds: {
+            ...s.project.meta.denseSeeds,
+            [name]: seed,
+          },
+        },
+      },
+    })),
+  spreadsheet: null,
+  openSpreadsheet: (name, mode = 'bool') =>
+    set({ spreadsheet: { name, mode } }),
+  closeSpreadsheet: () => set({ spreadsheet: null }),
 }))

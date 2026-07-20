@@ -3,6 +3,8 @@ export interface MatrixViewProps {
   labels: string[]
   matrix: number[][]
   highlight?: Set<string>
+  /** Open spreadsheet editor when header is clicked */
+  onEdit?: () => void
 }
 
 /** Map a cell value to a Tailwind background class (0 → slate, >0 → blue/violet scale). */
@@ -16,7 +18,7 @@ function cellColor(value: number, max: number): string {
   return 'bg-violet-500'
 }
 
-export function MatrixView({ title, labels, matrix, highlight }: MatrixViewProps) {
+export function MatrixView({ title, labels, matrix, highlight, onEdit }: MatrixViewProps) {
   const n = labels.length
   const max = matrix.reduce(
     (acc, row) => Math.max(acc, ...(row.length ? row.map((v) => Math.abs(v)) : [0])),
@@ -34,7 +36,19 @@ export function MatrixView({ title, labels, matrix, highlight }: MatrixViewProps
 
   return (
     <div className="space-y-1.5">
-      <div className="text-xs font-medium text-slate-300">{title}</div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-xs font-medium text-slate-300">{title}</div>
+        {onEdit && (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="text-[10px] text-sky-400/90 hover:text-sky-300 border border-sky-800/50 rounded px-1.5 py-0.5"
+            title="Edit as spreadsheet"
+          >
+            Sheet
+          </button>
+        )}
+      </div>
       <div
         className="inline-grid gap-px bg-slate-900/60 p-px rounded overflow-auto max-w-full"
         style={{

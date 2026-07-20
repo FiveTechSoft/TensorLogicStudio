@@ -4,6 +4,7 @@ import { kindColor } from './nodes/TLNode'
 
 const PALETTE_KINDS: NodeKind[] = [
   'relation',
+  'tensor',
   'rule',
   'query',
   'run',
@@ -18,6 +19,10 @@ function defaultLabel(kind: NodeKind): string {
       return 'Matrix View'
     case 'einsum':
       return 'Einsum'
+    case 'tensor':
+      return 'T'
+    case 'relation':
+      return 'R'
     default:
       return kind.charAt(0).toUpperCase() + kind.slice(1)
   }
@@ -27,17 +32,31 @@ export function Palette() {
   const nodes = useProjectStore((s) => s.project.graph.nodes)
   const edges = useProjectStore((s) => s.project.graph.edges)
   const setGraph = useProjectStore((s) => s.setGraph)
+  const openSpreadsheet = useProjectStore((s) => s.openSpreadsheet)
+  const setSelected = useProjectStore((s) => s.setSelected)
 
   const addNode = (kind: NodeKind) => {
     const offset = nodes.length * 28
+    const label = defaultLabel(kind)
     const node: GraphNode = {
-      id: `n-${crypto.randomUUID()}`,
+      id:
+        kind === 'relation'
+          ? `relation:${label}`
+          : kind === 'tensor'
+            ? `tensor:${label}`
+            : `n-${crypto.randomUUID()}`,
       kind,
-      label: defaultLabel(kind),
+      label,
       position: { x: 80 + offset, y: 80 + offset },
       data: {},
     }
     setGraph([...nodes, node], edges)
+    setSelected(node.id)
+    if (kind === 'relation') {
+      openSpreadsheet(label, 'bool')
+    } else if (kind === 'tensor') {
+      openSpreadsheet(label, 'dense')
+    }
   }
 
   return (

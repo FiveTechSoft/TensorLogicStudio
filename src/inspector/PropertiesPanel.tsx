@@ -8,6 +8,7 @@ export function PropertiesPanel() {
   const source = useProjectStore((s) => s.project.source)
   const setSource = useProjectStore((s) => s.setSource)
   const setStatus = useProjectStore((s) => s.setStatus)
+  const openSpreadsheet = useProjectStore((s) => s.openSpreadsheet)
 
   const node = selectedId
     ? nodes.find((n) => n.id === selectedId)
@@ -98,6 +99,22 @@ export function PropertiesPanel() {
             disabled:opacity-50 disabled:cursor-not-allowed"
         />
       </div>
+
+      {(node.kind === 'relation' || node.kind === 'tensor') && (
+        <button
+          type="button"
+          onClick={() => {
+            openSpreadsheet(
+              node.label,
+              node.kind === 'tensor' ? 'dense' : 'bool',
+            )
+            setStatus(`Spreadsheet: ${node.label}`)
+          }}
+          className="w-full text-left text-xs px-2 py-1.5 rounded border border-sky-800/60 bg-sky-950/30 text-sky-300 hover:bg-sky-950/60"
+        >
+          Edit as spreadsheet (mouse)
+        </button>
+      )}
 
       {canEditAst && (
         <p className="text-[11px] text-slate-600 leading-relaxed">
